@@ -3,7 +3,6 @@
 namespace Ekok\App\Event;
 
 use Ekok\App\Fw;
-use Ekok\App\HttpException;
 use Ekok\Utils\Arr;
 
 class ErrorEvent extends RequestEvent
@@ -29,7 +28,7 @@ class ErrorEvent extends RequestEvent
 
     public function getTrace(): array
     {
-        return Arr::formatTrace($this->error);
+        return Arr::formatTrace($this->error ?? array());
     }
 
     public function getMessage(): string|null
