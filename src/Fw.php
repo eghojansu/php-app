@@ -678,7 +678,7 @@ class Fw
         return $this->data['sent'] ?? ($this->data['sent'] = headers_sent());
     }
 
-    public function send($value, array $headers = null, int $code = null): static
+    public function send($value = null, array $headers = null, int $code = null): static
     {
         if (!$this->sent()) {
             if ($code || !$this->code()) {
@@ -705,7 +705,7 @@ class Fw
             header($protocol . ' ' . $statusCode . ' ' . $statusText, true, $statusCode);
             header('Content-Type: ' . $mime . ';charset=' . $charset, true, $statusCode);
 
-            $this->isQuiet() || $this->throttle($this->getOutput(), $this->getMatch()['kbps'] ?? 0);
+            empty($value) || $this->isQuiet() || $this->throttle($this->getOutput(), $this->getMatch()['kbps'] ?? 0);
         }
 
         return $this;
