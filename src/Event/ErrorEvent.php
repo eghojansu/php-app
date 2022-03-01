@@ -12,31 +12,13 @@ class ErrorEvent extends RequestEvent
     private $message;
     private $payload;
 
-    public function __construct(\Throwable|int $code, string $message = null, array $headers = null, array $payload = null)
+    public function __construct(int $code, string $message = null, array $headers = null, array $payload = null, \Throwable $error = null)
     {
-        $error_ = null;
-        $code_ = $code;
-        $headers_ = $headers;
-        $message_ = $message;
-        $payload_ = $payload;
-
-        if ($code instanceof \Throwable) {
-            $code_ = 500;
-            $error_ = $code;
-            $message_ = $message ?? ($code->getMessage() ?: null);
-        }
-
-        if ($code instanceof HttpException) {
-            $code_ = $code->statusCode;
-            $headers_ = $code->headers;
-            $payload_ = $code->payload;
-        }
-
-        $this->error = $error_;
-        $this->message = $message_;
-        $this->payload = $payload_;
-        $this->setCode($code_);
-        $this->setHeaders($headers_);
+        $this->error = $error;
+        $this->message = $message;
+        $this->payload = $payload;
+        $this->setCode($code);
+        $this->setHeaders($headers);
         $this->setName(Fw::EVENT_ERROR);
     }
 

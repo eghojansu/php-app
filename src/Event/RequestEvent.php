@@ -36,6 +36,11 @@ class RequestEvent extends Event
         return $this;
     }
 
+    public function getText(): string
+    {
+        return Fw::statusText($this->code);
+    }
+
     public function getOutput()
     {
         return $this->output;

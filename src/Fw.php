@@ -143,6 +143,14 @@ class Fw
         return $sorted;
     }
 
+    public static function statusText(int $code, bool &$exists = null): string
+    {
+        $exists = defined($httpCode = 'self::HTTP_' . $code);
+        $text = $exists ? constant($httpCode) : sprintf('Unsupported HTTP code: %s', $code);
+
+        return $text;
+    }
+
     public function &env(string $key)
     {
         if (0 === strpos($key, 'SESSION')) {
@@ -236,12 +244,30 @@ class Fw
 
     public function error(\Throwable|int $code = 500, string $message = null, array $headers = null, array $payload = null): static
     {
-        $event = new ErrorEvent($code, $message, $headers, $payload);
+        $error_ = null;
+        $code_ = $code;
+        $headers_ = $headers;
+        $message_ = $message;
+        $payload_ = $payload;
+
+        if ($code instanceof \Throwable) {
+            $code_ = 500;
+            $error_ = $code;
+            $message_ = $message ?? ($code->getMessage() ?: null);
+        }
+
+        if ($code instanceof HttpException) {
+            $code_ = $code->statusCode;
+            $headers_ = $code->headers;
+            $payload_ = $code->payload;
+        }
+
+        $event = new ErrorEvent($code_, $message_, $headers_, $payload_, $error_);
 
         try {
             $this->dispatcher->dispatch($event, null, true);
         } catch (\Throwable $error) {
-            $event = new ErrorEvent($error);
+            $event = new ErrorEvent(500, $error->getMessage() ?: null, error: $error);
         }
 
         return (
@@ -635,8 +661,7 @@ class Fw
 
     public function status(int $code, bool $throw = true): static
     {
-        $exists = defined($httpCode = 'self::HTTP_' . $code);
-        $text = $exists ? constant($httpCode) : sprintf('Unsupported HTTP code: %s', $code);
+        $text = self::statusText($code, $exists);
 
         if (!$exists && $throw) {
             throw new \LogicException($text);
@@ -943,10 +968,10 @@ TEXT;
     {
         $dev = $this->isDev();
         $data = array(
-            'code' => $this->code(),
-            'text' => $this->text(),
+            'code' => $error->getCode(),
+            'text' => $error->getText(),
             'data' => $error->getPayload(),
-            'message' => $error->getMessage() ?? sprintf('[%s] %s %s', $this->code(), $this->getVerb(), $this->getPath()),
+            'message' => $error->getMessage() ?? sprintf('[%s] %s %s', $error->getCode(), $this->getVerb(), $this->getPath()),
         );
 
         if ($dev) {
