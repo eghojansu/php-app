@@ -1,11 +1,12 @@
 <?php
 
-use Ekok\App\Event\ErrorEvent;
-use Ekok\App\Event\RequestEvent;
 use Ekok\App\Fw;
 use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
+use Ekok\Container\Box;
+use Ekok\App\Event\ErrorEvent;
+use Ekok\App\Event\RequestEvent;
 use Ekok\EventDispatcher\Dispatcher;
 
 class FwTest extends \Codeception\Test\Unit
@@ -22,8 +23,9 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->assertSame($this->fw->di->make('dispatcher'), $this->fw->di->make(Dispatcher::class));
         $this->assertSame($this->fw->di->make('cache'), $this->fw->di->make(Cache::class));
-        $this->assertSame($this->fw->di->make('fw'), $this->fw->di->make(Fw::class));
         $this->assertSame($this->fw->di->make('log'), $this->fw->di->make(Log::class));
+        $this->assertSame($this->fw->di->make('box'), $this->fw->di->make(Box::class));
+        $this->assertSame($this->fw->di->make('fw'), $this->fw->di->make(Fw::class));
         $this->assertSame($this->fw, $this->fw->di->make('fw'));
         $this->assertSame($this->fw->di, $this->fw->di->make(Di::class));
         $this->assertSame($this->fw->di, $this->fw->di->make('_di_'));

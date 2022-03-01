@@ -2,16 +2,17 @@
 
 namespace Ekok\App;
 
-use Ekok\App\Event\ErrorEvent;
-use Ekok\App\Event\RequestEvent;
-use Ekok\App\Event\ResponseEvent;
 use Ekok\Utils\Arr;
 use Ekok\Utils\Str;
+use Ekok\Utils\Val;
 use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
+use Ekok\Container\Box;
+use Ekok\App\Event\ErrorEvent;
+use Ekok\App\Event\RequestEvent;
+use Ekok\App\Event\ResponseEvent;
 use Ekok\EventDispatcher\Dispatcher;
-use Ekok\Utils\Val;
 
 class Fw
 {
@@ -84,6 +85,7 @@ class Fw
 
     public function __construct(
         public Di $di,
+        public Box $box,
         public Log $log,
         public Cache $cache,
         public Dispatcher $dispatcher,
@@ -97,9 +99,10 @@ class Fw
     {
         $as = static fn($alias) => compact('alias') + array('shared' => true, 'inherit' => false);
         $di = new Di($rules);
-        $self = new self($di, new Log(), new Cache(), new Dispatcher($di), $data, $env);
+        $self = new self($di, new Box(), new Log(), new Cache(), new Dispatcher($di), $data, $env);
 
         $di->inject($self, $as('fw'));
+        $di->inject($self->box, $as('box'));
         $di->inject($self->log, $as('log'));
         $di->inject($self->cache, $as('cache'));
         $di->inject($self->dispatcher, $as('dispatcher'));
