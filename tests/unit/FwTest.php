@@ -353,4 +353,34 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(null, $this->fw->session('foo'));
         $this->assertSame(array(), $this->fw->sessionEnd()->env('SESSION'));
     }
+
+    public function testLoad()
+    {
+        $this->assertSame(array(), $this->fw->getLoadDirectories());
+        $this->assertSame(array('.php'), $this->fw->getLoadExtensions());
+        $this->assertSame(array(TEST_DATA . '/files/'), $this->fw->setLoadDirectories(TEST_DATA . '/files')->getLoadDirectories());
+        $this->assertSame(array('.php'), $this->fw->setLoadExtensions('php')->getLoadExtensions());
+
+        $this->assertSame('foo: none', $this->fw->load('foo'));
+        $this->assertSame('foo: bar', $this->fw->load('foo', array('foo' => 'bar')));
+        $this->assertSame(null, $this->fw->load('none', null, true));
+    }
+
+    public function testLoadError()
+    {
+        $this->expectException('LogicException');
+        $this->expectExceptionMessage('Error in template: error.php (Error from template)');
+
+        $this->fw->setLoadDirectories(TEST_DATA . '/files');
+        $this->fw->load('error.php');
+    }
+
+    public function testLoadNotFound()
+    {
+        $this->expectException('LogicException');
+        $this->expectExceptionMessage('File not found: "none"');
+
+        $this->fw->setLoadDirectories(TEST_DATA . '/files');
+        $this->fw->load('none');
+    }
 }

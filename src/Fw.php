@@ -713,6 +713,86 @@ class Fw
         return $this;
     }
 
+    public function getLoadDirectories(): array
+    {
+        return $this->data['loadDirectories'] ?? array();
+    }
+
+    public function setLoadDirectories(string|array $directories): static
+    {
+        $this->data['loadDirectories'] = array_map(
+            static fn(string $dir) => rtrim(Str::fixslashes($dir), '/') . '/',
+            Arr::ensure($directories),
+        );
+
+        return $this;
+    }
+
+    public function getLoadExtensions(): array
+    {
+        return $this->data['loadExtensions'] ?? array('.php');
+    }
+
+    public function setLoadExtensions(string|array $extensions): static
+    {
+        $this->data['loadExtensions'] = array_map(
+            static fn(string $ext) => '.' . trim($ext, '.'),
+            Arr::ensure($extensions),
+        );
+
+        return $this;
+    }
+
+    public function load(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
+    {
+        $found = (
+            file_exists($found = $file)
+            || (
+                $found = Arr::first(
+                    $this->getLoadDirectories(),
+                    fn (string $dir) => (
+                        file_exists($found = $dir . $file)
+                        || ($found = Arr::first(
+                            $this->getLoadExtensions(),
+                            static fn(string $ext) => (
+                                file_exists($found = $dir . $file . $ext)
+                                || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
+                            )
+                        )) ? $found : null
+                    )
+                )
+            )
+        ) ? $found : null;
+
+        if (!$found && $safe) {
+            return $defaults;
+        }
+
+        if (!$found) {
+            throw new \LogicException(sprintf('File not found: "%s"', $file));
+        }
+
+        return (static function () {
+            try {
+                ob_start();
+                extract(func_get_arg(0));
+                require func_get_arg(1);
+
+                return ob_get_clean();
+            } catch (\Throwable $error) {
+                while (ob_get_level() > func_get_arg(2)) {
+                    ob_end_clean();
+                }
+
+                throw new \LogicException(sprintf(
+                    'Error in template: %s (%s)',
+                    func_get_arg(3),
+                    $error->getMessage(),
+                ), 0, $error);
+            }
+        })($data ?? array(), $found, ob_get_level(), $file);
+    }
+
     private function routeFind(string $path, array &$args = null): array|null
     {
         return Arr::first(
