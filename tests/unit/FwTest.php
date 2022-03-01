@@ -21,14 +21,13 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testDependencies()
     {
-        $this->assertSame($this->fw->di->make('dispatcher'), $this->fw->di->make(Dispatcher::class));
-        $this->assertSame($this->fw->di->make('cache'), $this->fw->di->make(Cache::class));
-        $this->assertSame($this->fw->di->make('log'), $this->fw->di->make(Log::class));
-        $this->assertSame($this->fw->di->make('box'), $this->fw->di->make(Box::class));
-        $this->assertSame($this->fw->di->make('fw'), $this->fw->di->make(Fw::class));
-        $this->assertSame($this->fw, $this->fw->di->make('fw'));
-        $this->assertSame($this->fw->di, $this->fw->di->make(Di::class));
-        $this->assertSame($this->fw->di, $this->fw->di->make('_di_'));
+        $this->assertSame($this->fw->getDispatcher(), $this->fw->getContainer()->make(Dispatcher::class));
+        $this->assertSame($this->fw->getCache(), $this->fw->getContainer()->make(Cache::class));
+        $this->assertSame($this->fw->getLog(), $this->fw->getContainer()->make(Log::class));
+        $this->assertSame($this->fw->getBox(), $this->fw->getContainer()->make(Box::class));
+        $this->assertSame($this->fw, $this->fw->getContainer()->make(Fw::class));
+        $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make(Di::class));
+        $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make('_di_'));
     }
 
     public function testInitializationAndState()

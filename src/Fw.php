@@ -83,31 +83,32 @@ class Fw
     private $routes = array();
     private $aliases = array();
 
-    public function __construct(
-        public Di $di,
-        public Box $box,
-        public Log $log,
-        public Cache $cache,
-        public Dispatcher $dispatcher,
-        private array|null $data = null,
-        private array|null $env = null,
-    ) {
+    public function __construct(private Di $di, private array|null $data = null, private array|null $env = null)
+    {
+        $this->di->inject($this);
         $this->initialize();
     }
 
     public static function create(array $data = null, array $rules = null, array $env = null)
     {
-        $as = static fn($alias) => compact('alias') + array('shared' => true, 'inherit' => false);
-        $di = new Di($rules);
-        $self = new self($di, new Box(), new Log(), new Cache(), new Dispatcher($di), $data, $env);
-
-        $di->inject($self, $as('fw'));
-        $di->inject($self->box, $as('box'));
-        $di->inject($self->log, $as('log'));
-        $di->inject($self->cache, $as('cache'));
-        $di->inject($self->dispatcher, $as('dispatcher'));
-
-        return $self;
+        return new self(
+            new Di(
+                array_replace_recursive(
+                    array_fill_keys(
+                        array(
+                            Box::class,
+                            Log::class,
+                            Cache::class,
+                            Dispatcher::class,
+                        ),
+                        array('shared' => true, 'inherit' => false),
+                    ),
+                    $rules ?? array(),
+                ),
+            ),
+            $data,
+            $env,
+        );
     }
 
     public static function httpAcceptParse(string $text, string $type = null, bool $sort = true): array
@@ -149,6 +150,31 @@ class Fw
         $text = $exists ? constant($httpCode) : sprintf('Unsupported HTTP code: %s', $code);
 
         return $text;
+    }
+
+    public function getContainer(): Di
+    {
+        return $this->di;
+    }
+
+    public function getBox(): Box
+    {
+        return $this->di->make(Box::class);
+    }
+
+    public function getLog(): Log
+    {
+        return $this->di->make(Log::class);
+    }
+
+    public function getCache(): Cache
+    {
+        return $this->di->make(Cache::class);
+    }
+
+    public function getDispatcher(): Dispatcher
+    {
+        return $this->di->make(Dispatcher::class);
     }
 
     public function &env(string $key)
@@ -265,7 +291,7 @@ class Fw
         $event = new ErrorEvent($code_, $message_, $headers_, $payload_, $error_);
 
         try {
-            $this->dispatcher->dispatch($event, null, true);
+            $this->getDispatcher()->dispatch($event, null, true);
         } catch (\Throwable $error) {
             $event = new ErrorEvent(500, $error->getMessage() ?: null, error: $error);
         }
@@ -919,7 +945,7 @@ TEXT;
 
     private function handleRun(): void
     {
-        $this->dispatcher->dispatch($event = new RequestEvent());
+        $this->getDispatcher()->dispatch($event = new RequestEvent());
 
         if ($event->isPropagationStopped()) {
             $this->handleRunResult(null, $event->getOutput());
@@ -955,7 +981,7 @@ TEXT;
 
     private function handleRunResult($result, string $output): void
     {
-        $this->dispatcher->dispatch($event = new ResponseEvent($result, $output));
+        $this->getDispatcher()->dispatch($event = new ResponseEvent($result, $output));
 
         if (is_callable($result_ = $event->getResult())) {
             $this->di->call($result_);
