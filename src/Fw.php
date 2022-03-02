@@ -138,7 +138,7 @@ class Fw
         $sorted = $accepts;
 
         usort($sorted, static function (array $a, array $b) use ($type) {
-            return ($b['q'] ?? 1) <=> ($b['q'] ?? 1);
+            return ($b['q'] ?? 1) <=> ($a['q'] ?? 1);
         });
 
         return $sorted;
