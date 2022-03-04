@@ -130,12 +130,14 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame(200, $this->fw->code());
         $this->assertSame('text/html', $this->fw->getMime());
+        $this->assertSame('foo', $this->fw->getOutput());
     }
 
     public function testSendCallableResponse()
     {
         $this->expectOutputString('foo');
 
+        $this->fw->noBuffering();
         $this->fw->send(static fn() => print('foo'), array('custom' => 'header'), 404, 'foo');
 
         if (function_exists('xdebug_get_headers')) {
@@ -150,6 +152,7 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame(404, $this->fw->code());
         $this->assertSame('foo', $this->fw->getMime());
+        $this->assertSame(null, $this->fw->getOutput());
     }
 
     public function testHeader()

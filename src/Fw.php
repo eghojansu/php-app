@@ -716,6 +716,23 @@ class Fw
         return $this;
     }
 
+    public function isBuffering(): bool
+    {
+        return $this->data['buffering'] ?? true;
+    }
+
+    public function setBuffering(bool $buffering): static
+    {
+        $this->data['buffering'] = $buffering;
+
+        return $this;
+    }
+
+    public function noBuffering(): static
+    {
+        return $this->setBuffering(false);
+    }
+
     public function code(): int|null
     {
         return $this->data['code'] ?? null;
@@ -1022,9 +1039,11 @@ TEXT;
 
     private function handleRunHandler(string|callable $handler, array|null $args): array
     {
-        ob_start();
+        $direct = !$this->isBuffering();
+
+        $direct || ob_start();
         $result = $this->di->callArguments($handler, $args);
-        $output = ob_get_clean();
+        $output = $direct ? null : ob_get_clean();
 
         return array($result, $output);
     }
