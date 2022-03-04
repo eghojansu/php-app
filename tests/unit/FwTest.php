@@ -136,7 +136,7 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->expectOutputString('foo');
 
-        $this->fw->send(static fn() => print('foo'), array('custom' => 'header'), 'foo', 404);
+        $this->fw->send(static fn() => print('foo'), array('custom' => 'header'), 404, 'foo');
 
         if (function_exists('xdebug_get_headers')) {
             $headers = xdebug_get_headers();

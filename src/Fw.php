@@ -745,7 +745,7 @@ class Fw
         return $this->data['sent'] ?? ($this->data['sent'] = headers_sent());
     }
 
-    public function send($value = null, array $headers = null, string|null $mime = null, int $code = null): static
+    public function send($value = null, array $headers = null, int $code = null, string|null $mime = null): static
     {
         if (!$this->sent()) {
             if ($code || !$this->code()) {
