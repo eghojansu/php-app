@@ -17,6 +17,8 @@ class FwTest extends \Codeception\Test\Unit
     public function _before()
     {
         $this->fw = Fw::create(array('quiet' => true));
+
+        header_remove();
     }
 
     public function testDependencies()
@@ -125,6 +127,29 @@ class FwTest extends \Codeception\Test\Unit
 
             $this->assertSame($expected, $headers);
         }
+
+        $this->assertSame(200, $this->fw->code());
+        $this->assertSame('text/html', $this->fw->getMime());
+    }
+
+    public function testSendCallableResponse()
+    {
+        $this->expectOutputString('foo');
+
+        $this->fw->send(static fn() => print('foo'), array('custom' => 'header'), 'foo', 404);
+
+        if (function_exists('xdebug_get_headers')) {
+            $headers = xdebug_get_headers();
+            $expected = array(
+                'Custom: header',
+                'Content-Type: foo;charset=UTF-8',
+            );
+
+            $this->assertSame($expected, $headers);
+        }
+
+        $this->assertSame(404, $this->fw->code());
+        $this->assertSame('foo', $this->fw->getMime());
     }
 
     public function testHeader()

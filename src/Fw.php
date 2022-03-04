@@ -698,7 +698,7 @@ class Fw
         }
 
         if ($mime || (!$this->getMime() && $set)) {
-            $this->setMime($set);
+            $this->setMime($mime ?? $set);
         }
 
         return $this;
@@ -752,49 +752,48 @@ class Fw
                 $this->status($code ?? 200);
             }
 
-            $this->setOutput($value, $mime);
             $this->setHeaders($headers ?? array());
+            $this->setOutput($value, $mime);
 
-            $sCode = $this->code();
-            $sText = $this->text();
-            $sMime = $this->getMime();
-            $sCharset = $this->getCharset();
-            $sProt = $this->getProtocol();
-            $sOut = $this->getOutput();
-            $sEnd = $sOut && !$this->isQuiet();
+            $status = $this->code();
+            $output = $this->getOutput();
 
-            $this->hasHeader('Content-Type') || $this->addHeader('Content-Type', $sMime . ';charset=' . $sCharset);
-            $this->hasHeader('Content-Length') || $this->addHeader('Content-Length', strlen($sOut));
+            if (!$this->hasHeader('Content-Type') && $this->getMime()) {
+                $this->addHeader('Content-Type', $this->getMime() . ';charset=' . $this->getCharset());
+            }
 
-            foreach ($this->data['headers'] ?? array() as $name => $value) {
+            if (!$this->hasHeader('Content-Length') && $output) {
+                $this->addHeader('Content-Length', strlen($output));
+            }
+
+            foreach ($this->data['headers'] ?? array() as $name => $headers) {
                 $set = ucwords($name, '-') . ': ';
-                $replace = isset($value[1]);
+                $replace = isset($headers[1]);
 
-                foreach ($value as $header) {
-                    header($set . $header, $replace, $sCode);
+                foreach ($headers as $header) {
+                    header($set . $header, $replace, $status);
                 }
             }
 
-            header($sProt . ' ' . $sCode . ' ' . $sText, true, $sCode);
+            header($this->getProtocol() . ' ' . $status . ' ' . $this->text(), true, $status);
 
-            if ($sEnd) {
-                $speed = $this->getMatch('kbps', 0);
-
-                $this->throttle($sOut, $speed);
+            if (is_callable($value)) {
+                $this->di->call($value);
+            } elseif (!$this->isQuiet() && $output) {
+                $this->throttle($output, $this->getMatch('kbps', 0));
             }
         }
 
         return $this;
     }
 
-    public function throttle(\Stringable|string|null $text, int $kbps): void
+    public function throttle(string|null $text, int $kbps): void
     {
         if ($text && 0 < $kbps) {
             $ctr = 0;
             $now = microtime(true);
-            $txt = $text instanceof \Stringable ? (string) $text : $text;
 
-            foreach (str_split($txt, 1024) as $part) {
+            foreach (str_split($text, 1024) as $part) {
                 // Throttle output
                 ++$ctr;
 
