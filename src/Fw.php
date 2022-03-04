@@ -299,7 +299,7 @@ class Fw
         return (
             $this
                 ->status($event->getCode(), false)
-                ->send($event->getOutput() ?? $this->errorBuild($event), $event->getHeaders())
+                ->send($event->getOutput() ?? $this->errorBuild($event), $event->getHeaders(), $event->getMime())
         );
     }
 
@@ -374,9 +374,9 @@ class Fw
         return $this->url($this->getPath(), $this->env['GET'] ?? array(), $absolute);
     }
 
-    public function getMatch(): array|null
+    public function getMatch(string $key = null, array|string|callable|null $default = null): array|string|callable|null
     {
-        return $this->data['match'] ?? null;
+        return $key ? ($this->data['match'][$key] ?? $default) : ($this->data['match'] ?? null);
     }
 
     public function getAliases(): array
@@ -612,35 +612,67 @@ class Fw
         return $this;
     }
 
-    public function getHeaders(): array
+    public function hasHeader(string $name, array &$found = null): bool
     {
-        return array_map(
-            static fn(array $value) => array_reduce(
-                $value,
-                static fn (array $norm, array $value) => array_merge($norm, array($value[0])),
-                array(),
-            ),
-            $this->data['headers'] ?? array(),
-        );
+        $found = array();
+
+        if (isset($this->data['headers'][$name])) {
+            $found = array($name);
+        } else {
+            $found = preg_grep(
+                '/^' . preg_quote($name, '/') . '$/i',
+                array_keys($this->data['headers'] ?? array()),
+            ) ?: array();
+        }
+
+        return !!$found;
     }
 
-    public function setHeader(string $name, $value, bool $replace = null): static
+    public function getHeaders(): array
     {
-        if (is_array($value)) {
-            array_walk($value, function ($value) use ($name, $replace) {
-                $this->data['headers'][$name][] = array($value, $replace);
-            });
+        return $this->data['headers'] ?? array();
+    }
+
+    public function addHeader(string $name, $value, bool $replace = true): static
+    {
+        if ($replace) {
+            $this->removeHeaders($name);
+
+            $this->data['headers'][$name] = (array) $value;
         } else {
-            $this->data['headers'][$name][] = array($value, $replace ?? true);
+            if (is_array($value)) {
+                array_walk($value, function ($value) use ($name) {
+                    $this->data['headers'][$name][] = $value;
+                });
+            } else {
+                $this->data['headers'][$name][] = $value;
+            }
         }
 
         return $this;
     }
 
-    public function setHeaders(array $headers): static
+    public function setHeaders(array $headers, bool $replace = false): static
     {
+        if ($replace) {
+            $this->data['headers'] = array();
+        }
+
         array_walk($headers, function ($value, $name) {
-            $this->setHeader($name, $value);
+            $this->addHeader($name, $value, false);
+        });
+
+        return $this;
+    }
+
+    public function removeHeaders(string ...$keys): static
+    {
+        array_walk($keys, function ($key) {
+            $this->hasHeader($key, $found);
+
+            array_walk($found, function ($key) {
+                unset($this->data['headers'][$key]);
+            });
         });
 
         return $this;
@@ -651,13 +683,22 @@ class Fw
         return $this->data['output'] ?? null;
     }
 
-    public function setOutput($value): static
+    public function setOutput($value, string $mime = null): static
     {
+        $set = null;
+
         if (is_array($value) || $value instanceof \JsonSerializable) {
+            $set = 'application/json';
+
             $this->data['output'] = json_encode($value);
-            $this->data['mime'] = $this->getMime() ?? 'application/json';
         } elseif (is_scalar($value) || $value instanceof \Stringable) {
+            $set = 'text/html';
+
             $this->data['output'] = (string) $value;
+        }
+
+        if ($mime || (!$this->getMime() && $set)) {
+            $this->setMime($set);
         }
 
         return $this;
@@ -704,46 +745,56 @@ class Fw
         return $this->data['sent'] ?? ($this->data['sent'] = headers_sent());
     }
 
-    public function send($value = null, array $headers = null, int $code = null): static
+    public function send($value = null, array $headers = null, string|null $mime = null, int $code = null): static
     {
         if (!$this->sent()) {
             if ($code || !$this->code()) {
                 $this->status($code ?? 200);
             }
 
-            $this->setOutput($value);
+            $this->setOutput($value, $mime);
             $this->setHeaders($headers ?? array());
 
-            $statusCode = $this->code();
-            $statusText = $this->text();
-            $mime = $this->getMime() ?? 'text/html';
-            $charset = $this->getCharset();
-            $protocol = $this->getProtocol();
+            $sCode = $this->code();
+            $sText = $this->text();
+            $sMime = $this->getMime();
+            $sCharset = $this->getCharset();
+            $sProt = $this->getProtocol();
+            $sOut = $this->getOutput();
+            $sEnd = $sOut && !$this->isQuiet();
+
+            $this->hasHeader('Content-Type') || $this->addHeader('Content-Type', $sMime . ';charset=' . $sCharset);
+            $this->hasHeader('Content-Length') || $this->addHeader('Content-Length', strlen($sOut));
 
             foreach ($this->data['headers'] ?? array() as $name => $value) {
                 $set = ucwords($name, '-') . ': ';
+                $replace = isset($value[1]);
 
-                foreach ($value as list($val, $replace)) {
-                    header($set . $val, $replace, $statusCode);
+                foreach ($value as $header) {
+                    header($set . $header, $replace, $sCode);
                 }
             }
 
-            header($protocol . ' ' . $statusCode . ' ' . $statusText, true, $statusCode);
-            header('Content-Type: ' . $mime . ';charset=' . $charset, true, $statusCode);
+            header($sProt . ' ' . $sCode . ' ' . $sText, true, $sCode);
 
-            empty($value) || $this->isQuiet() || $this->throttle($this->getOutput(), $this->getMatch()['kbps'] ?? 0);
+            if ($sEnd) {
+                $speed = $this->getMatch('kbps', 0);
+
+                $this->throttle($sOut, $speed);
+            }
         }
 
         return $this;
     }
 
-    public function throttle(string|null $text, int $kbps): void
+    public function throttle(\Stringable|string|null $text, int $kbps): void
     {
         if ($text && 0 < $kbps) {
             $ctr = 0;
             $now = microtime(true);
+            $txt = $text instanceof \Stringable ? (string) $text : $text;
 
-            foreach (str_split($text, 1024) as $part) {
+            foreach (str_split($txt, 1024) as $part) {
                 // Throttle output
                 ++$ctr;
 

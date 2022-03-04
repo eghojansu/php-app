@@ -88,7 +88,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('OK', $this->fw->text());
         $this->assertSame('foo', $this->fw->setOutput('foo')->getOutput());
         $this->assertSame('["foo"]', $this->fw->setOutput(array('foo'))->getOutput());
-        $this->assertSame('application/json', $this->fw->getMime());
+        $this->assertSame('text/html', $this->fw->getMime());
 
         $actual = $this->fw->setHeaders(array(
             'location' => 'url',
@@ -120,10 +120,25 @@ class FwTest extends \Codeception\Test\Unit
             $expected = array(
                 'Custom: header',
                 'Content-Type: text/html;charset=UTF-8',
+                'Content-Length: 3',
             );
 
             $this->assertSame($expected, $headers);
         }
+    }
+
+    public function testHeader()
+    {
+        $this->assertFalse($this->fw->hasHeader('Content-Type'));
+
+        $this->fw->setHeaders(array('Content-Type' => 'foo'), true);
+
+        $this->assertTrue($this->fw->hasHeader('Content-Type'));
+        $this->assertTrue($this->fw->hasHeader('content-type'));
+
+        $this->fw->removeHeaders('content-type');
+
+        $this->assertFalse($this->fw->hasHeader('Content-Type'));
     }
 
     public function testThrottle()
@@ -298,6 +313,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->fw->chain(static function (Dispatcher $dispatcher) use (&$called) {
             $dispatcher->on(Fw::EVENT_ERROR, static function (ErrorEvent $event) use (&$called) {
                 $called = $event->setPayload(null)->setMessage('Update ' . $event->getMessage())->getError() instanceof \LogicException;
+                $event->setMime('set');
 
                 throw new \RuntimeException($event->getMessage() . ' and Error after error');
             });

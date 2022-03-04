@@ -9,6 +9,7 @@ class ErrorEvent extends RequestEvent
 {
     private $error;
     private $message;
+    private $mime;
     private $payload;
 
     public function __construct(int $code, string $message = null, array $headers = null, array $payload = null, \Throwable $error = null)
@@ -39,6 +40,18 @@ class ErrorEvent extends RequestEvent
     public function setMessage(string|null $message): static
     {
         $this->message = $message;
+
+        return $this;
+    }
+
+    public function getMime(): string|null
+    {
+        return $this->mime;
+    }
+
+    public function setMime(string|null $mime): static
+    {
+        $this->mime = $mime;
 
         return $this;
     }
