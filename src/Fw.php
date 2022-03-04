@@ -1033,10 +1033,12 @@ TEXT;
     {
         $this->getDispatcher()->dispatch($event = new ResponseEvent($result, $output));
 
-        if (is_callable($result_ = $event->getResult())) {
-            $this->di->call($result_);
-        } else {
-            $this->send(null === $result_ ? $event->getOutput() : $result_);
+        if (!$response = $event->getResult()) {
+            $this->send($event->getOutput());
+        } elseif (is_callable($response)) {
+            $this->di->call($response);
+        } elseif (is_scalar($response) || is_array($response) || $response instanceof \Stringable) {
+            $this->send($response);
         }
     }
 
