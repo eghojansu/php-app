@@ -462,6 +462,28 @@ class Fw
         return self::httpAcceptParse($this->env['SERVER']['HTTP_ACCEPT'] ?? '')[0] ?? '*/*';
     }
 
+    public function headers(string $key = null): array|string|null
+    {
+        if ($key) {
+            $key_ = strtoupper(str_replace('-', '_', $key));
+
+            return $this->env['SERVER'][$key_] ?? $this->env['SERVER']['HTTP_' . $key_] ?? null;
+        }
+
+        return Arr::reduce(
+            $this->env['SERVER'] ?? array(),
+            static fn ($headers, $header, $key) => $headers + (
+                str_starts_with($key, 'HTTP_') ?
+                    array(ucwords(strtolower(str_replace('_', '-', substr($key, 5))), '-') => $header) :
+                    array()
+            ),
+            array(
+                'Content-Type' => $this->env['SERVER']['CONTENT_TYPE'] ?? null,
+                'Content-Length' => $this->env['SERVER']['CONTENT_LENGTH'] ?? null,
+            ),
+        );
+    }
+
     public function getBasePath(): string
     {
         return $this->data['basePath'] ?? ($this->data['basePath'] = $this->isBuiltin() || $this->isCli() ? '' : Str::fixslashes(dirname($this->env['SERVER']['SCRIPT_NAME'] ?? '')));
@@ -733,6 +755,22 @@ class Fw
         return $this->setBuffering(false);
     }
 
+    public function getBufferingLevel(): int|null
+    {
+        return $this->data['buffering_level'] ?? null;
+    }
+
+    public function stopBuffering(): static
+    {
+        if ($level = $this->getBufferingLevel()) {
+            while (ob_get_level() > $level) {
+                # code...
+            }
+        }
+
+        return $this;
+    }
+
     public function code(): int|null
     {
         return $this->data['code'] ?? null;
@@ -764,66 +802,161 @@ class Fw
 
     public function send($value = null, array $headers = null, int $code = null, string|null $mime = null): static
     {
-        if (!$this->sent()) {
-            if ($code || !$this->code()) {
-                $this->status($code ?? 200);
+        if ($this->sent()) {
+            return $this;
+        }
+
+        if ($code || !$this->code()) {
+            $this->status($code ?? 200);
+        }
+
+        $this->setHeaders($headers ?? array());
+        $this->setOutput($value, $mime);
+
+        $status = $this->code();
+        $output = $this->getOutput();
+
+        if (!$this->hasHeader('Content-Type') && $this->getMime()) {
+            $this->addHeader('Content-Type', $this->getMime() . ';charset=' . $this->getCharset());
+        }
+
+        if (!$this->hasHeader('Content-Length') && $output) {
+            $this->addHeader('Content-Length', strlen($output));
+        }
+
+        foreach ($this->data['headers'] ?? array() as $name => $headers) {
+            $set = ucwords($name, '-') . ': ';
+            $replace = empty($headers[1]);
+
+            foreach ($headers as $header) {
+                header($set . $header, $replace, $status);
             }
+        }
 
-            $this->setHeaders($headers ?? array());
-            $this->setOutput($value, $mime);
+        header($this->getProtocol() . ' ' . $status . ' ' . $this->text(), true, $status);
 
-            $status = $this->code();
-            $output = $this->getOutput();
-
-            if (!$this->hasHeader('Content-Type') && $this->getMime()) {
-                $this->addHeader('Content-Type', $this->getMime() . ';charset=' . $this->getCharset());
-            }
-
-            if (!$this->hasHeader('Content-Length') && $output) {
-                $this->addHeader('Content-Length', strlen($output));
-            }
-
-            foreach ($this->data['headers'] ?? array() as $name => $headers) {
-                $set = ucwords($name, '-') . ': ';
-                $replace = isset($headers[1]);
-
-                foreach ($headers as $header) {
-                    header($set . $header, $replace, $status);
-                }
-            }
-
-            header($this->getProtocol() . ' ' . $status . ' ' . $this->text(), true, $status);
-
-            if (is_callable($value)) {
-                $this->di->call($value);
-            } elseif (!$this->isQuiet() && $output) {
-                $this->throttle($output, $this->getMatch('kbps', 0));
-            }
+        if (is_callable($value)) {
+            $this->di->call($value);
+        } elseif (!$this->isQuiet() && $output) {
+            $this->throttle($output, $this->getMatch('kbps', 0));
         }
 
         return $this;
     }
 
-    public function throttle(string|null $text, int $kbps): void
+    public function sendFile(string $file, array $headers): static
     {
-        if ($text && 0 < $kbps) {
-            $ctr = 0;
-            $now = microtime(true);
+        if ($this->sent()) {
+            return $this;
+        }
 
-            foreach (str_split($text, 1024) as $part) {
-                // Throttle output
-                ++$ctr;
+        $modifiedSince = $this->headers('if_modified_since');
+        $lastModified = filemtime($file);
+        $notModified = $modifiedSince && strtotime($modifiedSince) === $lastModified;
 
-                $sleep = !connection_aborted() && $ctr / $kbps > ($elapsed = microtime(true) - $now);
+        $this->addHeader('Last-Modified', gmdate("D, d M Y H:i:s", $lastModified) . " GMT");
 
-                if ($sleep) {
-                    usleep(round(1e6 * ($ctr / $kbps - $elapsed)));
-                }
+        if ($notModified) {
+            return $this->send(null, null, 304);
+        }
 
-                echo $part;
-            }
+        $size = filesize($file);
+        $range = $this->headers('range');
+        list($status, $offset, $length) = preg_match('/^bytes=(\d+)(?:-(\d+))?/', $range, $parts) ? array(
+            206,
+            intval($parts[1]),
+            intval($parts[2] ?? $size) - intval($parts[1])
+        ) : array(200, 0, $size);
+        $invalid = $parts && ($offset >= $length || $offset < 0 || $offset >= $size);
+
+        if ($invalid) {
+            return $this->send(null, array('Content-Range' => 'bytes */' . $size), 416);
+        }
+
+        $this->setHeaders(array(
+            'Accept-Ranges' => 'bytes',
+            'Content-Length' => sprintf('%u', $length),
+            'Cache-Control' => 'public, max-age=604800',
+            'Expires' => gmdate("D, d M Y H:i:s", time() + 604800) . " GMT",
+        ));
+        $this->setHeaders($headers ?? array());
+
+        if ($parts) {
+            $this->addHeader('Content-Range', sprintf('bytes %u-%u/%u', $offset, $length, $size));
+        }
+
+        $this->stopBuffering();
+        $this->setMime($this->fileMime($file));
+        $this->status($status);
+        $this->send();
+
+        if ($kbps) {
+            $this->throttleFile($file, $kbps, $offset, $length);
         } else {
-            echo $text;
+            $fp = fopen($file, 'rb');
+
+            if ($offset > 0) {
+                fseek($fp, $offset);
+            }
+
+            echo fread($fp, $length);
+            flush();
+            fclose($fp);
+        }
+
+        return $this;
+    }
+
+    public function throttleFile(string $file, int $kbps, int $seek = null, int $length = null): void
+    {
+        $now = microtime(true);
+        $ctr = 0;
+        $pos = 0;
+        $fp = fopen($file, 'rb');
+        $size = $length ?? filesize($file);
+
+        if ($seek > 0) {
+            fseek($fp, $seek);
+        }
+
+        while (CONNECTION_NORMAL === connection_status() && $pos < $size) {
+            $part = fread($fp, 1024);
+            $pos += strlen($part);
+
+            echo $part;
+            flush();
+
+            $elapsed = microtime(true) - $now;
+            $sleep = ++$ctr / $kbps > $elapsed;
+
+            if ($sleep) {
+                usleep(round(1e6 * ($ctr / $kbps - $elapsed)));
+            }
+        }
+
+        fclose($fp);
+    }
+
+    public function throttle(string $text, int $kbps): void
+    {
+        $now = microtime(true);
+        $ctr = 0;
+        $pos = 0;
+        $size = strlen($text);
+
+        while (CONNECTION_NORMAL === connection_status() && $pos < $size) {
+            $part = substr($text, $pos, 1024);
+            $pos += strlen($part);
+
+            echo $part;
+            flush();
+
+            $elapsed = microtime(true) - $now;
+            $sleep = ++$ctr / $kbps > $elapsed;
+
+            if ($sleep) {
+                usleep(round(1e6 * ($ctr / $kbps - $elapsed)));
+            }
         }
     }
 
