@@ -372,6 +372,35 @@ class Fw
         return $this->isContentType('json');
     }
 
+    public function isRaw(): bool
+    {
+        return $this->box['RAW'] ?? false;
+    }
+
+    public function setRaw(bool $raw): static
+    {
+        $this->box['RAW'] = $raw;
+
+        return $this;
+    }
+
+    public function getJson(): array
+    {
+        return json_decode($this->getBody() ?? '[]', true) ?: array();
+    }
+
+    public function getBody(): string|null
+    {
+        return $this->box['BODY'] ?? ($this->box['BODY'] = $this->isRaw() ? null : file_get_contents('php://input'));
+    }
+
+    public function setBody(string $body): static
+    {
+        $this->box['BODY'] = $body;
+
+        return $this;
+    }
+
     public function wantsJson(): bool
     {
         return $this->accept('json');

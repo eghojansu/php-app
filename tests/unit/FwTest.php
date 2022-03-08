@@ -601,4 +601,13 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertFileExists($file);
         $this->assertStringContainsString('[info] [500 - Internal Server Error] GET /', file_get_contents($file));
     }
+
+    public function testBody()
+    {
+        $this->assertFalse($this->fw->isRaw());
+        $this->assertTrue($this->fw->setRaw(true)->isRaw());
+        $this->assertFalse($this->fw->setRaw(false)->isRaw());
+
+        $this->assertSame(array('foo' => 'bar'), $this->fw->setBody('{"foo":"bar"}')->getJson());
+    }
 }
