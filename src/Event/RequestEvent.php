@@ -10,6 +10,9 @@ class RequestEvent extends Event
     /** @var int */
     private $code;
 
+    /** @var int */
+    private $speed;
+
     /** @var mixed */
     private $output;
 
@@ -61,6 +64,18 @@ class RequestEvent extends Event
     public function setHeaders(array|null $headers): static
     {
         $this->headers = $headers;
+
+        return $this;
+    }
+
+    public function getSpeed(): int|null
+    {
+        return $this->speed;
+    }
+
+    public function setSpeed(int $speed): static
+    {
+        $this->speed = $speed;
 
         return $this;
     }

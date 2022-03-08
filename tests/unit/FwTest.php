@@ -16,7 +16,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function _before()
     {
-        $this->fw = Fw::create(array('quiet' => true));
+        $this->fw = Fw::create(array('QUIET' => true));
 
         header_remove();
     }
@@ -137,7 +137,7 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->expectOutputString('foo');
 
-        $this->fw->noBuffering();
+        $this->fw->setBuffering(false);
         $this->fw->send(static fn() => print('foo'), array('custom' => 'header'), 404, 'foo');
 
         if (function_exists('xdebug_get_headers')) {
@@ -155,6 +155,126 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(null, $this->fw->getOutput());
     }
 
+    public function testSendTwice()
+    {
+        $this->fw->send('foo');
+        $this->fw->send('bar');
+
+        $this->assertSame('foo', $this->fw->getOutput());
+    }
+
+    /** @dataProvider sendFileProvider */
+    public function testSendFile(array|string $expected, array $env = null, ...$args)
+    {
+        $fw = Fw::create($env);
+
+        list($output, $code) = ((array) $expected) + array('', 200);
+
+        $this->expectOutputString($output);
+
+        $fw->sendFile(...$args);
+
+        $this->assertSame($code, $fw->code());
+    }
+
+    public function sendFileProvider()
+    {
+        $file = TEST_DATA . '/files/foo.txt';
+        $lastModified = gmdate('D, d M Y H:i:s', filemtime($file)) . ' GMT';
+
+        return array(
+            'normal' => array(
+                'foobar',
+                null,
+                $file,
+            ),
+            'download' => array(
+                'foobar',
+                null,
+                $file,
+                null,
+                true,
+            ),
+            'not modified' => array(
+                array('', 304),
+                array(
+                    'SERVER' => array(
+                        'HTTP_IF_MODIFIED_SINCE' => $lastModified,
+                    ),
+                ),
+                $file,
+            ),
+            'buffer' => array(
+                array('foobar', 200),
+                null,
+                $file,
+                null,
+                null,
+                false,
+                null,
+                100,
+            ),
+            'with range' => array(
+                array('oob', 206),
+                array(
+                    'SERVER' => array(
+                        'HTTP_RANGE' => 'bytes=1-3',
+                    ),
+                ),
+                $file,
+                null,
+                null,
+                true,
+            ),
+            'with range prefix' => array(
+                array('obar', 206),
+                array(
+                    'SERVER' => array(
+                        'HTTP_RANGE' => 'bytes=2-',
+                    ),
+                ),
+                $file,
+                null,
+                null,
+                true,
+            ),
+            'with range suffix' => array(
+                array('bar', 206),
+                array(
+                    'SERVER' => array(
+                        'HTTP_RANGE' => 'bytes=-3',
+                    ),
+                ),
+                $file,
+                null,
+                null,
+                true,
+            ),
+            'invalid range' => array(
+                array('', 416),
+                array(
+                    'SERVER' => array(
+                        'HTTP_RANGE' => 'bytes=1',
+                    ),
+                ),
+                $file,
+                null,
+                null,
+                true,
+            ),
+        );
+    }
+
+    public function testSendFileTwice()
+    {
+        $this->expectOutputString('foobar');
+
+        $this->fw->sendFile(TEST_DATA . '/files/foo.txt');
+        $this->fw->sendFile(TEST_DATA . '/files/none.txt');
+
+        $this->assertSame(200, $this->fw->code());
+    }
+
     public function testHeader()
     {
         $this->assertFalse($this->fw->hasHeader('Content-Type'));
@@ -169,37 +289,10 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertFalse($this->fw->hasHeader('Content-Type'));
     }
 
-    public function testThrottle()
-    {
-        $longText = str_repeat('foo', 1000);
-
-        $this->expectOutputString($longText);
-
-        $start = microtime(true);
-        $this->fw->throttle($longText, 2);
-        $end = microtime(true) - $start;
-
-        $this->assertGreaterThan(1, $end);
-    }
-
-    public function testHttpAcceptParse()
-    {
-        $accept = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
-        $actual = Fw::httpAcceptParse($accept);
-        $expected = array(
-            array('content' => 'text/html'),
-            array('content' => 'application/xhtml+xml'),
-            array('content' => 'application/xml', 'q' => 0.9),
-            array('content' => '*/*', 'q' => 0.8),
-        );
-
-        $this->assertSame($expected, $actual);
-    }
-
     /** @dataProvider runProvider */
     public function testRun($expected, array $env = null)
     {
-        $fw = Fw::create(array('quiet' => true) + ($env['env'] ?? array()), null, $env);
+        $fw = Fw::create(($env ?? array()) + array('QUIET' => true));
         $fw->errorTemplate(null, 'cli', '[CLI] [{code} - {text}] {message}');
         $fw->errorTemplate(null, 'html', '[HTML] [{code} - {text}] {message}');
 
@@ -214,6 +307,12 @@ class FwTest extends \Codeception\Test\Unit
             return isset($aliases['eater']) ? $foods . '-' . $match['name'] . '-' . implode(':', $match['tags']) : null;
         });
         $fw->route('GET /result', static fn() => static fn (Fw $fw) => $fw->send('result'));
+        $fw->route('GET /send-twice', static function(Fw $fw) {
+            echo 'line 1';
+
+            return $fw->send('line 2');
+        });
+        $fw->route('GET /limited [kbps=100]', static fn() => 'it is actually limited by 100 kbps');
         $fw->run();
 
         $this->assertSame($expected, $fw->getOutput());
@@ -249,7 +348,7 @@ class FwTest extends \Codeception\Test\Unit
                 ),
             )),
             'not found html' => array('[HTML] [404 - Not Found] [404] GET /eat', array(
-                'env' => array('cli' => false),
+                'CLI' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
                 ),
@@ -271,6 +370,17 @@ class FwTest extends \Codeception\Test\Unit
                     'REQUEST_URI' => '/drink',
                 ),
             )),
+            'send twice' => array('line 2', array(
+                'SERVER' => array(
+                    'REQUEST_URI' => '/send-twice',
+                ),
+            )),
+            'with limiter' => array('it is actually limited by 100 kbps', array(
+                'QUIET' => false,
+                'SERVER' => array(
+                    'REQUEST_URI' => '/limited',
+                ),
+            )),
         );
     }
 
@@ -284,7 +394,9 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRunErrorJson()
     {
-        $fw = Fw::create(array('quiet' => true, 'dev' => true), null, array(
+        $fw = Fw::create(array(
+            'QUIET' => true,
+            'DEV' => true,
             'SERVER' => array(
                 'REQUEST_URI' => '/none',
                 'HTTP_ACCEPT' => 'json',
@@ -302,7 +414,7 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->fw->chain(static function (Dispatcher $dispatcher) {
             $dispatcher->on(Fw::EVENT_REQUEST, static function (RequestEvent $event) {
-                $event->setOutput('foo')->stopPropagation();
+                $event->setOutput('foo')->setSpeed(0)->stopPropagation();
             });
         });
         $this->fw->run();
@@ -353,7 +465,8 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testUrl()
     {
-        $fw = Fw::create(array('cli' => false), null, array(
+        $fw = Fw::create(array(
+            'CLI' => false,
             'SERVER' => array(
                 'REQUEST_URI' => '/basedir/front.php/path',
                 'SCRIPT_NAME' => '/basedir/front.php',
@@ -386,25 +499,9 @@ class FwTest extends \Codeception\Test\Unit
         $fw->alias('view');
     }
 
-    public function testEnv()
-    {
-        $this->assertSame($_SERVER, $this->fw->env('SERVER'));
-        $this->assertSame($_SESSION ?? array(), $this->fw->env('SESSION'));
-        $this->assertSame(null, $this->fw->cookie('foo'));
-        $this->assertSame(null, $this->fw->session('foo'));
-        $this->assertSame('bar', $this->fw->session('foo', 'bar'));
-        $this->assertSame('bar', $this->fw->session('foo'));
-        $this->assertSame('bar', $this->fw->flash('foo'));
-        $this->assertSame(null, $this->fw->session('foo'));
-        $this->assertSame(array(), $this->fw->sessionEnd()->env('SESSION'));
-    }
-
     public function testLoad()
     {
-        $this->assertSame(array(), $this->fw->getLoadDirectories());
-        $this->assertSame(array('.php'), $this->fw->getLoadExtensions());
-        $this->assertSame(array(TEST_DATA . '/files/'), $this->fw->setLoadDirectories(TEST_DATA . '/files')->getLoadDirectories());
-        $this->assertSame(array('.php'), $this->fw->setLoadExtensions('php')->getLoadExtensions());
+        $this->fw->loadSetup(TEST_DATA . '/files', 'php');
 
         $this->assertSame('foo: none', $this->fw->load('foo'));
         $this->assertSame('foo: bar', $this->fw->load('foo', array('foo' => 'bar')));
@@ -416,7 +513,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->expectException('LogicException');
         $this->expectExceptionMessage('Error in template: error.php (Error from template)');
 
-        $this->fw->setLoadDirectories(TEST_DATA . '/files');
+        $this->fw->loadSetup(TEST_DATA . '/files');
         $this->fw->load('error.php');
     }
 
@@ -425,7 +522,56 @@ class FwTest extends \Codeception\Test\Unit
         $this->expectException('LogicException');
         $this->expectExceptionMessage('File not found: "none"');
 
-        $this->fw->setLoadDirectories(TEST_DATA . '/files');
+        $this->fw->loadSetup(TEST_DATA . '/files');
         $this->fw->load('none');
+    }
+
+    public function testHeaders()
+    {
+        $fw = Fw::create(array(
+            'SERVER' => array(
+                'CONTENT_TYPE' => 'text/plain',
+                'HTTP_ACCEPT' => 'json',
+            ),
+        ));
+
+        $this->assertSame('text/plain', $fw->headers('Content-Type'));
+        $this->assertSame(array('Content-Type' => 'text/plain', 'Content-Length' => null, 'Accept' => 'json'), $fw->headers());
+    }
+
+    public function testMimeList()
+    {
+        $mimeList = array(
+            'json' => 'application/json',
+            'mul' => array('mul1', 'mul2'),
+        );
+
+        $this->fw->setMimeList($mimeList);
+
+        $this->assertSame($mimeList, $this->fw->getMimeList());
+        $this->assertSame('application/json', $this->fw->getMimeFile('foo.json'));
+        $this->assertSame('mul1', $this->fw->getMimeFile('foo.mul'));
+        $this->assertSame('application/octet-stream', $this->fw->getMimeFile('foo.txt'));
+    }
+
+    public function testBoxListener()
+    {
+        $box = $this->fw->getBox();
+
+        $this->assertSame(array(), $box['COOKIE']);
+        $this->assertSame(array(), $box['SESSION']);
+
+        $box['SESSION.foo'] = 'bar';
+
+        $this->assertSame('bar', $box['SESSION.foo']);
+        $this->assertSame($_SESSION['foo'], $box['SESSION.foo']);
+        $this->assertSame('bar', $box->cut('SESSION.foo'));
+        $this->assertSame(array(), $box['SESSION']);
+        $this->assertSame($_SESSION, $box['SESSION']);
+
+        $box->remove('SESSION');
+
+        $this->assertSame(array(), $box['SESSION']);
+        $this->assertSame($_SESSION, $box['SESSION']);
     }
 }
