@@ -293,8 +293,8 @@ class FwTest extends \Codeception\Test\Unit
     public function testRun($expected, array $env = null)
     {
         $fw = Fw::create(($env ?? array()) + array('QUIET' => true));
-        $fw->errorTemplate(null, 'cli', '[CLI] [{code} - {text}] {message}');
-        $fw->errorTemplate(null, 'html', '[HTML] [{code} - {text}] {message}');
+        $fw->errorTemplate(null, 'cli', '[CLI] {message}');
+        $fw->errorTemplate(null, 'html', '[HTML] {message}');
 
         $fw->route('GET /', static fn() => 'home');
         $fw->route('GET /is-dev', static fn(Fw $fw) => array('dev' => $fw->isDev()));
@@ -342,12 +342,12 @@ class FwTest extends \Codeception\Test\Unit
                     'REQUEST_URI' => '/result',
                 ),
             )),
-            'not found' => array('[CLI] [404 - Not Found] [404] GET /eat', array(
+            'not found' => array('[CLI] [404 - Not Found] GET /eat', array(
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
                 ),
             )),
-            'not found html' => array('[HTML] [404 - Not Found] [404] GET /eat', array(
+            'not found html' => array('[HTML] [404 - Not Found] GET /eat', array(
                 'CLI' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
@@ -365,7 +365,7 @@ class FwTest extends \Codeception\Test\Unit
                     'REQUEST_METHOD' => 'POST',
                 ),
             )),
-            'not found by verb' => array('[CLI] [404 - Not Found] [404] GET /drink', array(
+            'not found by verb' => array('[CLI] [404 - Not Found] GET /drink', array(
                 'SERVER' => array(
                     'REQUEST_URI' => '/drink',
                 ),
@@ -573,5 +573,32 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame(array(), $box['SESSION']);
         $this->assertSame($_SESSION, $box['SESSION']);
+    }
+
+    public function testLogged()
+    {
+        $fw = Fw::create(array(
+            'QUIET' => true,
+        ), array(
+            Log::class => array(
+                'params' => array(
+                    'options' => array(
+                        'directory' => TEST_TMP . '/logs',
+                        'filename' => 'log',
+                        'enabled' => true,
+                    ),
+                ),
+            ),
+        ));
+        $file = TEST_TMP . '/logs/log.txt';
+
+        !is_file($file) || unlink($file);
+
+        $this->assertFileDoesNotExist($file);
+
+        $fw->error();
+
+        $this->assertFileExists($file);
+        $this->assertStringContainsString('[info] [500 - Internal Server Error] GET /', file_get_contents($file));
     }
 }

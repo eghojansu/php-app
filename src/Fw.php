@@ -211,7 +211,7 @@ class Fw
         }
 
         if (null === $event->getMessage()) {
-            $event->setMessage(sprintf('[%s] %s %s', $event->getCode(), $this->getVerb(), $this->getPath()));
+            $event->setMessage(sprintf('[%s - %s] %s %s', $event->getCode(), $event->getText(), $this->getVerb(), $this->getPath()));
         }
 
         $this->getLog()->log(
