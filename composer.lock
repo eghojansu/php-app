@@ -153,12 +153,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-logger.git",
-                "reference": "096af772d8c6847e7d2445a49d4f599acb3d4e40"
+                "reference": "867c977670f2cf0fe541f61c98480a797d4ddb7e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/096af772d8c6847e7d2445a49d4f599acb3d4e40",
-                "reference": "096af772d8c6847e7d2445a49d4f599acb3d4e40",
+                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/867c977670f2cf0fe541f61c98480a797d4ddb7e",
+                "reference": "867c977670f2cf0fe541f61c98480a797d4ddb7e",
                 "shasum": ""
             },
             "require": {
@@ -191,7 +191,7 @@
                 "issues": "https://github.com/eghojansu/php-logger/issues",
                 "source": "https://github.com/eghojansu/php-logger/tree/master"
             },
-            "time": "2022-03-01T03:31:22+00:00"
+            "time": "2022-03-08T09:43:24+00:00"
         },
         {
             "name": "ekok/php-utils",

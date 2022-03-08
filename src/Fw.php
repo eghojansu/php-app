@@ -210,6 +210,18 @@ class Fw
             $event = new ErrorEvent(500, $error->getMessage() ?: null, error: $error);
         }
 
+        if (null === $event->getMessage()) {
+            $event->setMessage(sprintf('[%s] %s %s', $event->getCode(), $this->getVerb(), $this->getPath()));
+        }
+
+        $this->getLog()->log(
+            Log::LEVEL_INFO,
+            $event->getMessage(),
+            Arr::formatTrace(
+                $event->getPayload() ?? $event->getError() ?? array()
+            ),
+        );
+
         $this->status($event->getCode(), false);
         $this->send($event->getOutput() ?? $this->errorBuild($event), $event->getHeaders(), $event->getMime());
 
@@ -1101,7 +1113,7 @@ class Fw
             'code' => $error->getCode(),
             'text' => $error->getText(),
             'data' => $error->getPayload(),
-            'message' => $error->getMessage() ?? sprintf('[%s] %s %s', $error->getCode(), $this->getVerb(), $this->getPath()),
+            'message' => $error->getMessage(),
         );
 
         if ($dev) {
