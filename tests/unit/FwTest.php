@@ -40,6 +40,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('', $this->fw->getEntry());
         $this->assertSame('HTTP/1.1', $this->fw->getProtocol());
         $this->assertSame('http', $this->fw->getScheme());
+        $this->assertSame(false, $this->fw->isSecure());
         $this->assertSame('localhost', $this->fw->getHost());
         $this->assertSame(80, $this->fw->getPort());
         $this->assertSame(null, $this->fw->getMime());
@@ -66,6 +67,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('foo.php', $this->fw->setEntry('foo.php')->getEntry());
         $this->assertSame('HTTP/1.0', $this->fw->setProtocol('HTTP/1.0')->getProtocol());
         $this->assertSame('https', $this->fw->setScheme('https')->getScheme());
+        $this->assertSame(true, $this->fw->setSecure(true)->isSecure());
         $this->assertSame('foo', $this->fw->setHost('foo')->getHost());
         $this->assertSame(8080, $this->fw->setPort(8080)->getPort());
         $this->assertSame('text/html', $this->fw->setMime('text/html')->getMime());
@@ -102,6 +104,9 @@ class FwTest extends \Codeception\Test\Unit
         );
 
         $this->assertSame($expected, $actual);
+        $this->assertSame($expected['location'], $this->fw->getHeader('location'));
+        $this->assertSame($expected['location'], $this->fw->getHeader('Location'));
+        $this->assertSame(array(), $this->fw->getHeader('unknown'));
 
         // status exception
         $this->expectException('LogicException');
@@ -609,5 +614,126 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertFalse($this->fw->setRaw(false)->isRaw());
 
         $this->assertSame(array('foo' => 'bar'), $this->fw->setBody('{"foo":"bar"}')->getJson());
+    }
+
+    public function testGmDate()
+    {
+        $fmt = 'D, d M Y H:i:s';
+        $now = new \DateTime();
+        $yes = new \DateTime('yesterday');
+        $tom = new \DateTime('tomorrow');
+        $t1 = new \DateTime('+2 hours');
+        $t2 = new \DateTime('-2 hours');
+
+        $this->assertSame($now->format($fmt) . ' GMT', Fw::gmDate($now));
+        $this->assertSame($yes->format($fmt) . ' GMT', Fw::gmDate($yes));
+        $this->assertSame($tom->format($fmt) . ' GMT', Fw::gmDate($tom));
+        $this->assertSame($tom->format($fmt) . ' GMT', Fw::gmDate('tomorrow'));
+
+        $this->assertSame($t1->format($fmt) . ' GMT', Fw::gmDate($t1->getTimestamp(), $diff));
+        $this->assertSame(7200, $diff);
+
+        $this->assertSame($t2->format($fmt) . ' GMT', Fw::gmDate($t2->getTimestamp(), $diff));
+        $this->assertSame(-7200, $diff);
+
+        $this->assertSame($t2->format($fmt) . ' GMT', Fw::gmDate(-7200, $diff));
+        $this->assertSame(-7200, $diff);
+    }
+
+    public function testRemoveCookie()
+    {
+        $this->assertEmpty($this->fw->cookie());
+
+        $this->fw->setCookie('foo', 'bar');
+
+        $this->assertSame('bar', $this->fw->cookie('foo'));
+        $this->assertRegExp('/^foo=bar; Domain=localhost; HttpOnly; SameSite=Lax$/', $this->fw->getHeader('set-cookie')[0]);
+
+        // remove
+        $this->fw->removeCookie('foo');
+
+        $this->assertEmpty($this->fw->cookie());
+        $this->assertRegExp('/^foo=deleted; Expires=.+ GMT; Max-Age=-2592000; Domain=localhost; HttpOnly; SameSite=Lax$/', $this->fw->getHeader('set-cookie')[1]);
+    }
+
+    /** @dataProvider cookieProvider */
+    public function testCookie(string $expected, string $name, string $value = null, array $jar = null)
+    {
+        $this->fw->setCookieJar($jar ?? array());
+
+        $this->assertEmpty($this->fw->cookie());
+
+        $this->fw->cookie($name, $value);
+
+        $this->assertSame($value, $this->fw->cookie($name));
+        $this->assertRegExp($expected, $this->fw->getHeader('set-cookie')[0]);
+    }
+
+    public function cookieProvider()
+    {
+        return array(
+            'normal' => array(
+                '/^foo=bar; Domain=localhost; HttpOnly; SameSite=Lax$/',
+                'foo',
+                'bar',
+            ),
+            'exp in 2 hour' => array(
+                '/^foo=bar; Expires=.+ GMT; Max-Age=7200; Domain=localhost; HttpOnly; SameSite=Lax$/',
+                'foo',
+                'bar',
+                array('expires' => '+2 hours'),
+            ),
+            'with secure path and custom samesite' => array(
+                '/^foo=bar; Domain=localhost; Path=\/foo; Secure; HttpOnly; SameSite=None$/',
+                'foo',
+                'bar',
+                array('path' => '/foo', 'secure' => true, 'samesite' => 'None'),
+            ),
+        );
+    }
+
+    /** @dataProvider cookieExceptionProvider */
+    public function testCookieException(string $expected, array $jar)
+    {
+        $this->expectException('LogicException');
+        $this->expectExceptionMessage($expected);
+
+        $this->fw->setCookieJar($jar);
+        $this->fw->setCookie('foo');
+    }
+
+    public function cookieExceptionProvider()
+    {
+        return array(
+            'invalid samesite' => array(
+                'Invalid samesite value: foo',
+                array(
+                    'samesite' => 'foo',
+                ),
+            ),
+            'samesite none but not secured' => array(
+                'Samesite None require a secure context',
+                array(
+                    'samesite' => 'none',
+                ),
+            ),
+        );
+    }
+
+    public function testSession()
+    {
+        $this->assertEmpty($this->fw->session());
+
+        $this->fw->session('foo', 'bar');
+
+        $this->assertSame('bar', $this->fw->session('foo'));
+        $this->assertSame(array('foo' => 'bar'), $this->fw->session());
+        $this->assertSame($_SESSION, $this->fw->session());
+        $this->assertSame($GLOBALS['_SESSION'], $this->fw->session());
+
+        $this->assertSame('bar', $this->fw->flash('foo'));
+        $this->assertEmpty($this->fw->session());
+        $this->assertSame($_SESSION, $this->fw->session());
+        $this->assertSame($GLOBALS['_SESSION'], $this->fw->session());
     }
 }

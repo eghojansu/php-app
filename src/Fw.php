@@ -117,6 +117,19 @@ class Fw
         return $text;
     }
 
+    public static function gmDate(\DateTime|string|int $time = null, int &$diff = null): string
+    {
+        $ts = match(true) {
+            $time instanceof \DateTime => $time->getTimestamp(),
+            is_string($time) => strtotime($time),
+            $time < 0 => time() + $time,
+            default => $time ?? time(),
+        };
+        $diff = $ts - time();
+
+        return gmdate('D, d M Y H:i:s', $ts) . ' GMT';
+    }
+
     public function getContainer(): Di
     {
         return $this->di;
@@ -492,9 +505,21 @@ class Fw
         return $this;
     }
 
+    public function isSecure(): bool
+    {
+        return $this->box['SECURE'] ?? ($this->box['SECURE'] = !!($this->box['SERVER']['HTTPS'] ?? null));
+    }
+
+    public function setSecure(bool $secure): static
+    {
+        $this->box['SECURE'] = $secure;
+
+        return $this;
+    }
+
     public function getScheme(): string
     {
-        return $this->box['SCHEME'] ?? ($this->box['SCHEME'] = ($this->box['SERVER']['HTTPS'] ?? '') ? 'https' : 'http');
+        return $this->box['SCHEME'] ?? ($this->box['SCHEME'] = $this->isSecure() ? 'https' : 'http');
     }
 
     public function setScheme(string $scheme): static
@@ -632,6 +657,15 @@ class Fw
         return !!$found;
     }
 
+    public function getHeader(string $key): array
+    {
+        return Arr::reduce(
+            $this->hasHeader($key, $found) ? $found : array(),
+            fn(array $headers, string $header) => array_merge($headers, $this->box['HEADERS'][$header]),
+            array(),
+        );
+    }
+
     public function getHeaders(): array
     {
         return $this->box['HEADERS'] ?? array();
@@ -680,6 +714,128 @@ class Fw
         });
 
         return $this;
+    }
+
+    public function getCookieJar(): array
+    {
+        return $this->box['COOKIE_JAR'] ?? array(
+            'expires' => null,
+            'path' => $this->getBasePath(),
+            'domain' => $this->getHost(),
+            'secure' => $this->isSecure(),
+            'httponly' => true,
+            'raw' => false,
+            'samesite' => 'Lax',
+        );
+    }
+
+    public function setCookieJar(array $jar): static
+    {
+        $this->box['COOKIE_JAR'] = array_replace($this->getCookieJar(), $jar);
+
+        return $this;
+    }
+
+    public function cookie(string $name = null, ...$set)
+    {
+        if ($name) {
+            if ($set) {
+                $this->setCookie($name, $set[0]);
+            }
+
+            return $this->box['COOKIE'][$name] ?? $set[0] ?? null;
+        }
+
+        return $this->box['COOKIE'];
+    }
+
+    public function setCookie(
+        string $name,
+        string $value = null,
+        \DateTime|string|int $expires = null,
+        string $path = null,
+        string $domain = null,
+        bool $secure = null,
+        bool $httponly = null,
+        string $samesite = null,
+        bool $raw = null,
+    ): static {
+        $jar = $this->getCookieJar();
+        $cookie = $name . '=';
+
+        if ($value) {
+            $cookie .= ($raw ?? $jar['raw']) ? urlencode($value) : $value;
+
+            $this->box['COOKIE'][$name] = $value;
+        } else {
+            $exp = -2592000;
+            $cookie .= 'deleted';
+
+            unset($this->box['COOKIE'][$name]);
+        }
+
+        if ($set = $exp ?? $expires ?? $jar['expires']) {
+            $cookie .= '; Expires=' . self::gmDate($set, $max) . '; Max-Age=' . $max;
+        }
+
+        if ($set = $domain ?? $jar['domain']) {
+            $cookie .= '; Domain=' . $set;
+        }
+
+        if ($set = $path ?? $jar['path']) {
+            $cookie .= '; Path=' . $set;
+        }
+
+        if ($set = $secure ?? $jar['secure']) {
+            $cookie .= '; Secure';
+        }
+
+        if ($set = $httponly ?? $jar['httponly']) {
+            $cookie .= '; HttpOnly';
+        }
+
+        if ($set = $samesite ?? $jar['samesite']) {
+            if (!in_array($low = strtolower($set), array('lax', 'strict', 'none'))) {
+                throw new \LogicException(sprintf('Invalid samesite value: %s', $set));
+            }
+
+            if ('none' === $low && false === strpos($cookie, '; Secure')) {
+                throw new \LogicException('Samesite None require a secure context');
+            }
+
+            $cookie .= '; SameSite=' . ucfirst($low);
+        }
+
+        return $this->addHeader('Set-Cookie', $cookie, false);
+    }
+
+    public function removeCookie(
+        string $name,
+        string $path = null,
+        string $domain = null,
+        bool $secure = null,
+        bool $httponly = null,
+        string $samesite = null,
+    ): static {
+        return $this->setCookie($name, null, null, $path, $domain, $secure, $httponly, $samesite);
+    }
+
+    public function session(string $name = null, ...$set)
+    {
+        if ($name) {
+            if ($set) {
+                $this->box['SESSION'][$name] = $set[0];
+            }
+
+            return $this->box['SESSION'][$name] ?? null;
+        }
+
+        return $this->box['SESSION'];
+    }
+
+    public function flash(string $name)
+    {
+        return $this->box->cut('SESSION.' . $name);
     }
 
     public function getOutput(): string|null
@@ -835,7 +991,7 @@ class Fw
         $lastModified = filemtime($file);
         $modifiedSince = $this->headers('if_modified_since');
 
-        $this->addHeader('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
+        $this->addHeader('Last-Modified', self::gmDate($lastModified));
 
         if ($range) {
             $this->addHeader('Accept-Ranges', 'bytes');
