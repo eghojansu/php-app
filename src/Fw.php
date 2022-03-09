@@ -1112,9 +1112,9 @@ class Fw
         return $this;
     }
 
-    public function loadSetup(string|array $directories, string|array $extensions = null): static
+    public function viewSetup(string|array $directories, string|array $extensions = null): static
     {
-        $this->box['LOAD'] = array(
+        $this->box['VIEW'] = array(
             'directories' => array_map(
                 static fn(string $dir) => rtrim(Str::fixslashes($dir), '/') . '/',
                 Arr::ensure($directories),
@@ -1128,17 +1128,17 @@ class Fw
         return $this;
     }
 
-    public function load(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
+    public function view(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
     {
         $found = (
             file_exists($found = $file)
             || (
                 $found = Arr::first(
-                    $this->box['LOAD']['directories'] ?? array(),
+                    $this->box['VIEW']['directories'] ?? array(),
                     fn (string $dir) => (
                         file_exists($found = $dir . $file)
                         || ($found = Arr::first(
-                            $this->box['LOAD']['extensions'] ?? array('.php'),
+                            $this->box['VIEW']['extensions'] ?? array('.php'),
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
                                 || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null

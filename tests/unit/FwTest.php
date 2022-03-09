@@ -504,31 +504,31 @@ class FwTest extends \Codeception\Test\Unit
         $fw->alias('view');
     }
 
-    public function testLoad()
+    public function testView()
     {
-        $this->fw->loadSetup(TEST_DATA . '/files', 'php');
+        $this->fw->viewSetup(TEST_DATA . '/files', 'php');
 
-        $this->assertSame('foo: none', $this->fw->load('foo'));
-        $this->assertSame('foo: bar', $this->fw->load('foo', array('foo' => 'bar')));
-        $this->assertSame(null, $this->fw->load('none', null, true));
+        $this->assertSame('foo: none', $this->fw->view('foo'));
+        $this->assertSame('foo: bar', $this->fw->view('foo', array('foo' => 'bar')));
+        $this->assertSame(null, $this->fw->view('none', null, true));
     }
 
-    public function testLoadError()
+    public function testViewError()
     {
         $this->expectException('LogicException');
         $this->expectExceptionMessage('Error in template: error.php (Error from template)');
 
-        $this->fw->loadSetup(TEST_DATA . '/files');
-        $this->fw->load('error.php');
+        $this->fw->viewSetup(TEST_DATA . '/files');
+        $this->fw->view('error.php');
     }
 
-    public function testLoadNotFound()
+    public function testViewNotFound()
     {
         $this->expectException('LogicException');
         $this->expectExceptionMessage('File not found: "none"');
 
-        $this->fw->loadSetup(TEST_DATA . '/files');
-        $this->fw->load('none');
+        $this->fw->viewSetup(TEST_DATA . '/files');
+        $this->fw->view('none');
     }
 
     public function testHeaders()
