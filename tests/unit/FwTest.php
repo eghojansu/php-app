@@ -24,12 +24,17 @@ class FwTest extends \Codeception\Test\Unit
     public function testDependencies()
     {
         $this->assertSame($this->fw->getDispatcher(), $this->fw->getContainer()->make(Dispatcher::class));
+        $this->assertSame($this->fw->getDispatcher(), $this->fw->getContainer()->make('dispatcher'));
         $this->assertSame($this->fw->getCache(), $this->fw->getContainer()->make(Cache::class));
+        $this->assertSame($this->fw->getCache(), $this->fw->getContainer()->make('cache'));
         $this->assertSame($this->fw->getLog(), $this->fw->getContainer()->make(Log::class));
+        $this->assertSame($this->fw->getLog(), $this->fw->getContainer()->make('log'));
         $this->assertSame($this->fw->getBox(), $this->fw->getContainer()->make(Box::class));
+        $this->assertSame($this->fw->getBox(), $this->fw->getContainer()->make('box'));
         $this->assertSame($this->fw, $this->fw->getContainer()->make(Fw::class));
+        $this->assertSame($this->fw, $this->fw->getContainer()->make('fw'));
         $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make(Di::class));
-        $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make('_di_'));
+        $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make('di'));
     }
 
     public function testInitializationAndState()
@@ -451,6 +456,16 @@ class FwTest extends \Codeception\Test\Unit
         $this->fw->route('GET @home');
     }
 
+    public function testRouteAll()
+    {
+        $this->fw->routeAll(array(
+            'GET /' => static fn() => 'foo',
+        ));
+        $this->fw->run();
+
+        $this->assertSame('foo', $this->fw->getOutput());
+    }
+
     public function testErrorListener()
     {
         $called = false;
@@ -504,31 +519,31 @@ class FwTest extends \Codeception\Test\Unit
         $fw->alias('view');
     }
 
-    public function testView()
+    public function testRender()
     {
-        $this->fw->viewSetup(TEST_DATA . '/files', 'php');
+        $this->fw->renderSetup(TEST_DATA . '/files', 'php');
 
-        $this->assertSame('foo: none', $this->fw->view('foo'));
-        $this->assertSame('foo: bar', $this->fw->view('foo', array('foo' => 'bar')));
-        $this->assertSame(null, $this->fw->view('none', null, true));
+        $this->assertSame('foo: none', $this->fw->render('foo'));
+        $this->assertSame('foo: bar', $this->fw->render('foo', array('foo' => 'bar')));
+        $this->assertSame(null, $this->fw->render('none', null, true));
     }
 
-    public function testViewError()
+    public function testRenderError()
     {
         $this->expectException('LogicException');
         $this->expectExceptionMessage('Error in template: error.php (Error from template)');
 
-        $this->fw->viewSetup(TEST_DATA . '/files');
-        $this->fw->view('error.php');
+        $this->fw->renderSetup(TEST_DATA . '/files');
+        $this->fw->render('error.php');
     }
 
-    public function testViewNotFound()
+    public function testRenderNotFound()
     {
         $this->expectException('LogicException');
         $this->expectExceptionMessage('File not found: "none"');
 
-        $this->fw->viewSetup(TEST_DATA . '/files');
-        $this->fw->view('none');
+        $this->fw->renderSetup(TEST_DATA . '/files');
+        $this->fw->render('none');
     }
 
     public function testHeaders()
@@ -735,5 +750,20 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertEmpty($this->fw->session());
         $this->assertSame($_SESSION, $this->fw->session());
         $this->assertSame($GLOBALS['_SESSION'], $this->fw->session());
+    }
+
+    public function testLoadConfig()
+    {
+        $this->fw->load(TEST_DATA . '/files/config.php')->run();
+
+        $box = $this->fw->getBox();
+        $di = $this->fw->getContainer();
+
+        $this->assertSame('home', $this->fw->getOutput());
+        $this->assertSame('bar', $box['foo']);
+        $this->assertSame(true, $box['from_callable']);
+        $this->assertInstanceOf('stdClass', $std = $di->make('foo'));
+        $this->assertNotSame($std, $di->make('foo'));
+        $this->assertNotSame($std, $di->make('stdClass'));
     }
 }

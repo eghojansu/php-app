@@ -12,6 +12,7 @@ use Ekok\App\Event\ErrorEvent;
 use Ekok\App\Event\RequestEvent;
 use Ekok\App\Event\ResponseEvent;
 use Ekok\EventDispatcher\Dispatcher;
+use Ekok\Utils\File;
 
 class Fw
 {
@@ -84,8 +85,9 @@ class Fw
 
     public function __construct(private Di $di, private Box $box)
     {
-        $this->di->inject($this);
-        $this->di->inject($this->box);
+        $this->di->setAlias('di');
+        $this->di->inject($this, array('alias' => 'fw'));
+        $this->di->inject($this->box, array('alias' => 'box'));
         $this->initialize();
     }
 
@@ -94,13 +96,10 @@ class Fw
         return new self(
             new Di(
                 array_replace_recursive(
-                    array_fill_keys(
-                        array(
-                            Log::class,
-                            Cache::class,
-                            Dispatcher::class,
-                        ),
-                        array('shared' => true, 'inherit' => false),
+                    array(
+                        Log::class => array('shared' => true, 'inherit' => false, 'alias' => 'log'),
+                        Cache::class => array('shared' => true, 'inherit' => false, 'alias' => 'cache'),
+                        Dispatcher::class => array('shared' => true, 'inherit' => false, 'alias' => 'dispatcher'),
                     ),
                     $rules ?? array(),
                 ),
@@ -153,6 +152,35 @@ class Fw
     public function getDispatcher(): Dispatcher
     {
         return $this->di->make(Dispatcher::class);
+    }
+
+    public function load(string ...$files): static
+    {
+        array_walk($files, function (string $file) {
+            $data = File::load($file) ?? array();
+
+            array_walk($data, function ($value, $key) {
+                if ($value instanceof \Closure) {
+                    $this->di->call($value);
+                } elseif (
+                    is_string($key)
+                    && is_array($value)
+                    && (
+                        ($expr = $this->di->isCallExpression($key))
+                        || '@' === $key[0]
+                    )
+                ) {
+                    $call = $expr ? $key : static::class . $key;
+                    $norm = rtrim(strstr($call . '#', '#', true));
+
+                    $this->di->callArguments($norm, $value);
+                } else {
+                    $this->box->set($key, $value);
+                }
+            });
+        });
+
+        return $this;
     }
 
     public function isDev(): bool
@@ -320,6 +348,15 @@ class Fw
     public function getAliases(): array
     {
         return $this->aliases;
+    }
+
+    public function routeAll(array $routes): static
+    {
+        array_walk($routes, function ($handler, $route) {
+            $this->route($route, $handler);
+        });
+
+        return $this;
     }
 
     public function route(string $route, callable|string|null $handler = null): static
@@ -1112,9 +1149,9 @@ class Fw
         return $this;
     }
 
-    public function viewSetup(string|array $directories, string|array $extensions = null): static
+    public function renderSetup(string|array $directories, string|array $extensions = null): static
     {
-        $this->box['VIEW'] = array(
+        $this->box['RENDER'] = array(
             'directories' => array_map(
                 static fn(string $dir) => rtrim(Str::fixslashes($dir), '/') . '/',
                 Arr::ensure($directories),
@@ -1128,17 +1165,17 @@ class Fw
         return $this;
     }
 
-    public function view(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
+    public function render(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
     {
         $found = (
             file_exists($found = $file)
             || (
                 $found = Arr::first(
-                    $this->box['VIEW']['directories'] ?? array(),
+                    $this->box['RENDER']['directories'] ?? array(),
                     fn (string $dir) => (
                         file_exists($found = $dir . $file)
                         || ($found = Arr::first(
-                            $this->box['VIEW']['extensions'] ?? array('.php'),
+                            $this->box['RENDER']['extensions'] ?? array('.php'),
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
                                 || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
