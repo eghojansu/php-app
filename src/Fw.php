@@ -3,6 +3,7 @@
 namespace Ekok\App;
 
 use Ekok\Utils\Arr;
+use Ekok\Utils\File;
 use Ekok\Utils\Str;
 use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
@@ -12,7 +13,6 @@ use Ekok\App\Event\ErrorEvent;
 use Ekok\App\Event\RequestEvent;
 use Ekok\App\Event\ResponseEvent;
 use Ekok\EventDispatcher\Dispatcher;
-use Ekok\Utils\File;
 
 class Fw
 {
@@ -154,6 +154,13 @@ class Fw
         return $this->di->make(Dispatcher::class);
     }
 
+    public function chain(callable|string $cb): static
+    {
+        $this->di->call($cb);
+
+        return $this;
+    }
+
     public function load(string ...$files): static
     {
         array_walk($files, function (string $file) {
@@ -265,25 +272,6 @@ class Fw
 
         $this->status($event->getCode(), false);
         $this->send($event->getOutput() ?? $this->errorBuild($event), $event->getHeaders(), $event->getMime());
-
-        return $this;
-    }
-
-    public function errorTemplate(array $replace = null, string $name = null, string $template = null): static|string
-    {
-        $text = $template ?? $this->box['ERROR_' . $name] ?? ($this->isCli() ? $this->box['ERROR_CLI'] : $this->box['ERROR_HTML']);
-
-        if ($replace) {
-            return strtr($text, Arr::reduce(
-                $replace,
-                static fn (array $replace, $value, $key) => $replace + array('{' . $key . '}' => $value),
-                array(),
-            ));
-        }
-
-        if ($template && $name) {
-            $this->box['ERROR_' . $name] = $template;
-        }
 
         return $this;
     }
@@ -773,17 +761,9 @@ class Fw
         return $this;
     }
 
-    public function cookie(string $name = null, ...$set)
+    public function getCookie(string $name = null)
     {
-        if ($name) {
-            if ($set) {
-                $this->setCookie($name, $set[0]);
-            }
-
-            return $this->box['COOKIE'][$name] ?? $set[0] ?? null;
-        }
-
-        return $this->box['COOKIE'];
+        return $name ? ($this->box['COOKIE'][$name] ?? null) : $this->box['COOKIE'];
     }
 
     public function setCookie(
@@ -857,22 +837,21 @@ class Fw
         return $this->setCookie($name, null, null, $path, $domain, $secure, $httponly, $samesite);
     }
 
-    public function session(string $name = null, ...$set)
+    public function getSession(string $name = null)
     {
-        if ($name) {
-            if ($set) {
-                $this->box['SESSION'][$name] = $set[0];
-            }
-
-            return $this->box['SESSION'][$name] ?? null;
-        }
-
-        return $this->box['SESSION'];
+        return $name ? ($this->box['SESSION'][$name] ?? null) : $this->box['SESSION'];
     }
 
-    public function flash(string $name)
+    public function flashSession(string $name)
     {
         return $this->box->cut('SESSION.' . $name);
+    }
+
+    public function setSession(string $name, $value): static
+    {
+        $this->box['SESSION'][$name] = $value;
+
+        return $this;
     }
 
     public function getOutput(): string|null
@@ -1142,14 +1121,12 @@ class Fw
         }
     }
 
-    public function chain(callable|string $cb): static
+    public function getRenderSetup(): array
     {
-        $this->di->call($cb);
-
-        return $this;
+        return $this->box['RENDER'] ?? array();
     }
 
-    public function renderSetup(string|array $directories, string|array $extensions = null): static
+    public function setRenderSetup(string|array $directories, string|array $extensions = null): static
     {
         $this->box['RENDER'] = array(
             'directories' => array_map(
@@ -1167,15 +1144,16 @@ class Fw
 
     public function render(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
     {
+        $setup = $this->getRenderSetup();
         $found = (
             file_exists($found = $file)
             || (
                 $found = Arr::first(
-                    $this->box['RENDER']['directories'] ?? array(),
+                    $setup['directories'] ?? array(),
                     fn (string $dir) => (
                         file_exists($found = $dir . $file)
                         || ($found = Arr::first(
-                            $this->box['RENDER']['extensions'] ?? array('.php'),
+                            $setup['extensions'] ?? array('.php'),
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
                                 || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
@@ -1194,25 +1172,21 @@ class Fw
             throw new \LogicException(sprintf('File not found: "%s"', $file));
         }
 
-        return (static function () {
-            try {
-                ob_start();
-                extract(func_get_arg(0));
-                require func_get_arg(1);
+        File::load($found, $data, true, $output);
 
-                return ob_get_clean();
-            } catch (\Throwable $error) {
-                while (ob_get_level() > func_get_arg(2)) {
-                    ob_end_clean();
-                }
+        return $output;
+    }
 
-                throw new \LogicException(sprintf(
-                    'Error in template: %s (%s)',
-                    func_get_arg(3),
-                    $error->getMessage(),
-                ), 0, $error);
-            }
-        })($data ?? array(), $found, ob_get_level(), $file);
+    public function getErrorTemplate(string $name = null): string|null
+    {
+        return $this->box['ERROR_TEMPLATE'][$name] ?? $this->box['ERROR_TEMPLATE'][strtolower($name)] ?? null;
+    }
+
+    public function setErrorTemplate(string $name, string $template): static
+    {
+        $this->box['ERROR_TEMPLATE'][strtolower($name)] = $template;
+
+        return $this;
     }
 
     private function routeFind(string $path, array &$args = null): array|null
@@ -1346,19 +1320,21 @@ class Fw
             return $data;
         }
 
-        if ($this->isCli()) {
-            $replace = $data;
-            $replace['data'] = null;
-            $replace['trace'] = $dev ? implode("\n", $replace['trace']) : null;
-
-            return $this->errorTemplate($replace, 'cli');
-        }
-
         $replace = $data;
         $replace['data'] = null;
-        $replace['trace'] = $dev ? '<pre>' . implode("\n", $replace['trace']) . '</pre>' : null;
+        $replace['trace'] = $dev ? implode("\n", $replace['trace']) : null;
 
-        return $this->errorTemplate($replace, 'html');
+        if ($this->isCli()) {
+            $template = $this->getErrorTemplate('cli');
+        } else {
+            $template = $this->getErrorTemplate('html');
+
+            if ($dev) {
+                $replace['trace'] = '<pre>' . $replace['trace'] . '</pre>';
+            }
+        }
+
+        return strtr($template, Arr::quoteKeys($replace, '{}'));
     }
 
     private function initialize(): void
@@ -1371,7 +1347,7 @@ class Fw
             }
         });
 
-        $this->box['ERROR_HTML'] =
+        $this->box['ERROR_TEMPLATE']['html'] =
         <<<'HTML'
 <!doctype html>
 <html lang="en">
@@ -1389,7 +1365,7 @@ class Fw
   </body>
 </html>
 HTML;
-        $this->box['ERROR_CLI'] =
+        $this->box['ERROR_TEMPLATE']['cli'] =
         <<<'TEXT'
 {code} - {text}
 {message}

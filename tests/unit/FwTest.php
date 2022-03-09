@@ -303,8 +303,8 @@ class FwTest extends \Codeception\Test\Unit
     public function testRun($expected, array $env = null)
     {
         $fw = Fw::create(($env ?? array()) + array('QUIET' => true));
-        $fw->errorTemplate(null, 'cli', '[CLI] {message}');
-        $fw->errorTemplate(null, 'html', '[HTML] {message}');
+        $fw->setErrorTemplate('cli', '[CLI] {message}');
+        $fw->setErrorTemplate('html', '[HTML] {message}');
 
         $fw->route('GET /', static fn() => 'home');
         $fw->route('GET /is-dev', static fn(Fw $fw) => array('dev' => $fw->isDev()));
@@ -396,7 +396,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRunNoRoutes()
     {
-        $this->fw->errorTemplate(null, 'cli', '[CLI] [{code} - {text}] {message}');
+        $this->fw->setErrorTemplate('cli', '[CLI] [{code} - {text}] {message}');
         $this->fw->run();
 
         $this->assertSame('[CLI] [500 - Internal Server Error] No route defined', $this->fw->getOutput());
@@ -469,7 +469,7 @@ class FwTest extends \Codeception\Test\Unit
     public function testErrorListener()
     {
         $called = false;
-        $this->fw->errorTemplate(null, 'cli', '[CLI] [{code} - {text}] {message}');
+        $this->fw->setErrorTemplate('cli', '[CLI] [{code} - {text}] {message}');
         $this->fw->chain(static function (Dispatcher $dispatcher) use (&$called) {
             $dispatcher->on(Fw::EVENT_ERROR, static function (ErrorEvent $event) use (&$called) {
                 $called = $event->setPayload(null)->setMessage('Update ' . $event->getMessage())->getError() instanceof \LogicException;
@@ -521,7 +521,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRender()
     {
-        $this->fw->renderSetup(TEST_DATA . '/files', 'php');
+        $this->fw->setRenderSetup(TEST_DATA . '/files', 'php');
 
         $this->assertSame('foo: none', $this->fw->render('foo'));
         $this->assertSame('foo: bar', $this->fw->render('foo', array('foo' => 'bar')));
@@ -533,7 +533,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->expectException('LogicException');
         $this->expectExceptionMessage('Error in template: error.php (Error from template)');
 
-        $this->fw->renderSetup(TEST_DATA . '/files');
+        $this->fw->setRenderSetup(TEST_DATA . '/files');
         $this->fw->render('error.php');
     }
 
@@ -542,7 +542,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->expectException('LogicException');
         $this->expectExceptionMessage('File not found: "none"');
 
-        $this->fw->renderSetup(TEST_DATA . '/files');
+        $this->fw->setRenderSetup(TEST_DATA . '/files');
         $this->fw->render('none');
     }
 
@@ -657,17 +657,17 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRemoveCookie()
     {
-        $this->assertEmpty($this->fw->cookie());
+        $this->assertEmpty($this->fw->getCookie());
 
         $this->fw->setCookie('foo', 'bar');
 
-        $this->assertSame('bar', $this->fw->cookie('foo'));
+        $this->assertSame('bar', $this->fw->getCookie('foo'));
         $this->assertRegExp('/^foo=bar; Domain=localhost; HttpOnly; SameSite=Lax$/', $this->fw->getHeader('set-cookie')[0]);
 
         // remove
         $this->fw->removeCookie('foo');
 
-        $this->assertEmpty($this->fw->cookie());
+        $this->assertEmpty($this->fw->getCookie());
         $this->assertRegExp('/^foo=deleted; Expires=.+ GMT; Max-Age=-2592000; Domain=localhost; HttpOnly; SameSite=Lax$/', $this->fw->getHeader('set-cookie')[1]);
     }
 
@@ -676,11 +676,11 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->fw->setCookieJar($jar ?? array());
 
-        $this->assertEmpty($this->fw->cookie());
+        $this->assertEmpty($this->fw->getCookie());
 
-        $this->fw->cookie($name, $value);
+        $this->fw->getCookie($name, $value);
 
-        $this->assertSame($value, $this->fw->cookie($name));
+        $this->assertSame($value, $this->fw->getCookie($name));
         $this->assertRegExp($expected, $this->fw->getHeader('set-cookie')[0]);
     }
 
@@ -737,19 +737,19 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testSession()
     {
-        $this->assertEmpty($this->fw->session());
+        $this->assertEmpty($this->fw->getSession());
 
-        $this->fw->session('foo', 'bar');
+        $this->fw->setSession('foo', 'bar');
 
-        $this->assertSame('bar', $this->fw->session('foo'));
-        $this->assertSame(array('foo' => 'bar'), $this->fw->session());
-        $this->assertSame($_SESSION, $this->fw->session());
-        $this->assertSame($GLOBALS['_SESSION'], $this->fw->session());
+        $this->assertSame('bar', $this->fw->getSession('foo'));
+        $this->assertSame(array('foo' => 'bar'), $this->fw->getSession());
+        $this->assertSame($_SESSION, $this->fw->getSession());
+        $this->assertSame($GLOBALS['_SESSION'], $this->fw->getSession());
 
-        $this->assertSame('bar', $this->fw->flash('foo'));
-        $this->assertEmpty($this->fw->session());
-        $this->assertSame($_SESSION, $this->fw->session());
-        $this->assertSame($GLOBALS['_SESSION'], $this->fw->session());
+        $this->assertSame('bar', $this->fw->flashSession('foo'));
+        $this->assertEmpty($this->fw->getSession());
+        $this->assertSame($_SESSION, $this->fw->getSession());
+        $this->assertSame($GLOBALS['_SESSION'], $this->fw->getSession());
     }
 
     public function testLoadConfig()
