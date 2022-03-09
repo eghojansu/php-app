@@ -116,17 +116,18 @@ class Fw
         return $text;
     }
 
-    public static function gmDate(\DateTime|string|int $time = null, int &$diff = null): string
+    public static function gmDate(\DateTime|string|int $time = null, int &$diff = null, string $format = null): string
     {
+        $tz = new \DateTimeZone('GMT');
         $ts = match(true) {
-            $time instanceof \DateTime => $time->getTimestamp(),
-            is_string($time) => strtotime($time),
+            $time instanceof \DateTime => (clone $time)->setTimezone($tz)->getTimestamp(),
+            is_string($time) => (new \DateTime($time, $tz))->getTimestamp(),
             $time < 0 => time() + $time,
             default => $time ?? time(),
         };
         $diff = $ts - time();
 
-        return gmdate('D, d M Y H:i:s', $ts) . ' GMT';
+        return gmdate($format ?? \DateTimeInterface::RFC7231, $ts);
     }
 
     public function getContainer(): Di
@@ -1172,7 +1173,7 @@ class Fw
             throw new \LogicException(sprintf('File not found: "%s"', $file));
         }
 
-        File::load($found, $data, true, $output);
+        File::load($found, $data, $safe, $output);
 
         return $output;
     }
@@ -1187,6 +1188,41 @@ class Fw
         $this->box['ERROR_TEMPLATE'][strtolower($name)] = $template;
 
         return $this;
+    }
+
+    private function errorBuild(ErrorEvent $error): string|array
+    {
+        $dev = $this->isDev();
+        $data = array(
+            'code' => $error->getCode(),
+            'text' => $error->getText(),
+            'data' => $error->getPayload(),
+            'message' => $error->getMessage(),
+        );
+
+        if ($dev) {
+            $data['trace'] = $error->getTrace();
+        }
+
+        if ($this->wantsJson()) {
+            return $data;
+        }
+
+        $replace = $data;
+        $replace['data'] = null;
+        $replace['trace'] = $dev ? implode("\n", $replace['trace']) : null;
+
+        if ($this->isCli()) {
+            $template = $this->getErrorTemplate('cli');
+        } else {
+            $template = $this->getErrorTemplate('html');
+
+            if ($dev) {
+                $replace['trace'] = '<pre>' . $replace['trace'] . '</pre>';
+            }
+        }
+
+        return strtr($template, Arr::quoteKeys($replace, '{}'));
     }
 
     private function routeFind(string $path, array &$args = null): array|null
@@ -1253,7 +1289,7 @@ class Fw
         $this->getDispatcher()->dispatch($event = new RequestEvent());
 
         if ($event->isPropagationStopped()) {
-            $this->runResult(null, $event->getOutput(), $event->getSpeed());
+            $this->runResult(null, $event->getOutput(), $event->getKbps());
 
             return;
         }
@@ -1296,45 +1332,10 @@ class Fw
         if (is_callable($response = $event->getResult())) {
             $this->di->call($response);
         } elseif (!$response) {
-            $this->send($event->getOutput(), kbps: $event->getSpeed() ?? $speed);
+            $this->send($event->getOutput(), kbps: $event->getKbps() ?? $speed);
         } elseif (is_scalar($response) || is_array($response) || $response instanceof \Stringable) {
-            $this->send($response, kbps: $event->getSpeed() ?? $speed);
+            $this->send($response, kbps: $event->getKbps() ?? $speed);
         }
-    }
-
-    private function errorBuild(ErrorEvent $error): string|array
-    {
-        $dev = $this->isDev();
-        $data = array(
-            'code' => $error->getCode(),
-            'text' => $error->getText(),
-            'data' => $error->getPayload(),
-            'message' => $error->getMessage(),
-        );
-
-        if ($dev) {
-            $data['trace'] = $error->getTrace();
-        }
-
-        if ($this->wantsJson()) {
-            return $data;
-        }
-
-        $replace = $data;
-        $replace['data'] = null;
-        $replace['trace'] = $dev ? implode("\n", $replace['trace']) : null;
-
-        if ($this->isCli()) {
-            $template = $this->getErrorTemplate('cli');
-        } else {
-            $template = $this->getErrorTemplate('html');
-
-            if ($dev) {
-                $replace['trace'] = '<pre>' . $replace['trace'] . '</pre>';
-            }
-        }
-
-        return strtr($template, Arr::quoteKeys($replace, '{}'));
     }
 
     private function initialize(): void

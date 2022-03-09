@@ -11,7 +11,7 @@ class RequestEvent extends Event
     private $code;
 
     /** @var int */
-    private $speed;
+    private $kbps;
 
     /** @var mixed */
     private $output;
@@ -68,14 +68,14 @@ class RequestEvent extends Event
         return $this;
     }
 
-    public function getSpeed(): int|null
+    public function getKbps(): int|null
     {
-        return $this->speed;
+        return $this->kbps;
     }
 
-    public function setSpeed(int $speed): static
+    public function setKbps(int $kbps): static
     {
-        $this->speed = $speed;
+        $this->kbps = $kbps;
 
         return $this;
     }

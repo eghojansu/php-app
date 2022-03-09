@@ -358,6 +358,7 @@ class FwTest extends \Codeception\Test\Unit
                 ),
             )),
             'not found html' => array('[HTML] [404 - Not Found] GET /eat', array(
+                'DEV' => true,
                 'CLI' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
@@ -424,7 +425,7 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->fw->chain(static function (Dispatcher $dispatcher) {
             $dispatcher->on(Fw::EVENT_REQUEST, static function (RequestEvent $event) {
-                $event->setOutput('foo')->setSpeed(0)->stopPropagation();
+                $event->setOutput('foo')->setKbps(0)->stopPropagation();
             });
         });
         $this->fw->run();
@@ -531,7 +532,7 @@ class FwTest extends \Codeception\Test\Unit
     public function testRenderError()
     {
         $this->expectException('LogicException');
-        $this->expectExceptionMessage('Error in template: error.php (Error from template)');
+        $this->expectExceptionMessageMatches('/Error while loading: .+\/error.php \(Error from template\)/');
 
         $this->fw->setRenderSetup(TEST_DATA . '/files');
         $this->fw->render('error.php');
@@ -633,25 +634,26 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testGmDate()
     {
-        $fmt = 'D, d M Y H:i:s';
-        $now = new \DateTime();
-        $yes = new \DateTime('yesterday');
-        $tom = new \DateTime('tomorrow');
-        $t1 = new \DateTime('+2 hours');
-        $t2 = new \DateTime('-2 hours');
+        $tz = new \DateTimeZone('GMT');
+        $fmt = \DateTimeInterface::RFC7231;
+        $now = new \DateTime('now', $tz);
+        $yes = new \DateTime('yesterday', $tz);
+        $tom = new \DateTime('tomorrow', $tz);
+        $t1 = new \DateTime('+2 hours', $tz);
+        $t2 = new \DateTime('-2 hours', $tz);
 
-        $this->assertSame($now->format($fmt) . ' GMT', Fw::gmDate($now));
-        $this->assertSame($yes->format($fmt) . ' GMT', Fw::gmDate($yes));
-        $this->assertSame($tom->format($fmt) . ' GMT', Fw::gmDate($tom));
-        $this->assertSame($tom->format($fmt) . ' GMT', Fw::gmDate('tomorrow'));
+        $this->assertSame($now->format($fmt), Fw::gmDate($now));
+        $this->assertSame($yes->format($fmt), Fw::gmDate($yes));
+        $this->assertSame($tom->format($fmt), Fw::gmDate($tom));
+        $this->assertSame($tom->format($fmt), Fw::gmDate('tomorrow'));
 
-        $this->assertSame($t1->format($fmt) . ' GMT', Fw::gmDate($t1->getTimestamp(), $diff));
+        $this->assertSame($t1->format($fmt), Fw::gmDate($t1->getTimestamp(), $diff));
         $this->assertSame(7200, $diff);
 
-        $this->assertSame($t2->format($fmt) . ' GMT', Fw::gmDate($t2->getTimestamp(), $diff));
+        $this->assertSame($t2->format($fmt), Fw::gmDate($t2->getTimestamp(), $diff));
         $this->assertSame(-7200, $diff);
 
-        $this->assertSame($t2->format($fmt) . ' GMT', Fw::gmDate(-7200, $diff));
+        $this->assertSame($t2->format($fmt), Fw::gmDate(-7200, $diff));
         $this->assertSame(-7200, $diff);
     }
 
@@ -678,7 +680,7 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertEmpty($this->fw->getCookie());
 
-        $this->fw->getCookie($name, $value);
+        $this->fw->setCookie($name, $value);
 
         $this->assertSame($value, $this->fw->getCookie($name));
         $this->assertRegExp($expected, $this->fw->getHeader('set-cookie')[0]);
