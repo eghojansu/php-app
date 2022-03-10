@@ -1352,7 +1352,7 @@ class Fw
         }
     }
 
-    private function initialize(): void
+    protected function initialize(): void
     {
         $globals = explode('|', self::VAR_GLOBALS);
 
