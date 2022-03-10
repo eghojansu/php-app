@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-cache.git",
-                "reference": "5f4a28d067db55eb2c7274ece8e1714a9692912f"
+                "reference": "3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/5f4a28d067db55eb2c7274ece8e1714a9692912f",
-                "reference": "5f4a28d067db55eb2c7274ece8e1714a9692912f",
+                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d",
+                "reference": "3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d",
                 "shasum": ""
             },
             "require": {
@@ -50,7 +50,7 @@
                 "issues": "https://github.com/eghojansu/php-cache/issues",
                 "source": "https://github.com/eghojansu/php-cache/tree/master"
             },
-            "time": "2022-02-17T04:59:09+00:00"
+            "time": "2022-03-10T03:26:21+00:00"
         },
         {
             "name": "ekok/php-container",
@@ -153,12 +153,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-logger.git",
-                "reference": "867c977670f2cf0fe541f61c98480a797d4ddb7e"
+                "reference": "c09c3c222f4606dfc987e4797f637c98160f5729"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/867c977670f2cf0fe541f61c98480a797d4ddb7e",
-                "reference": "867c977670f2cf0fe541f61c98480a797d4ddb7e",
+                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/c09c3c222f4606dfc987e4797f637c98160f5729",
+                "reference": "c09c3c222f4606dfc987e4797f637c98160f5729",
                 "shasum": ""
             },
             "require": {
@@ -191,7 +191,7 @@
                 "issues": "https://github.com/eghojansu/php-logger/issues",
                 "source": "https://github.com/eghojansu/php-logger/tree/master"
             },
-            "time": "2022-03-08T09:43:24+00:00"
+            "time": "2022-03-10T03:29:29+00:00"
         },
         {
             "name": "ekok/php-utils",
@@ -199,12 +199,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "260051ad3afe15b28e5a9ffc4fca7cba8e927d2e"
+                "reference": "69bb50680816d4582616d5d0881fdf464488b078"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/260051ad3afe15b28e5a9ffc4fca7cba8e927d2e",
-                "reference": "260051ad3afe15b28e5a9ffc4fca7cba8e927d2e",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/69bb50680816d4582616d5d0881fdf464488b078",
+                "reference": "69bb50680816d4582616d5d0881fdf464488b078",
                 "shasum": ""
             },
             "require": {
@@ -237,7 +237,7 @@
                 "issues": "https://github.com/eghojansu/php-utils/issues",
                 "source": "https://github.com/eghojansu/php-utils/tree/master"
             },
-            "time": "2022-03-09T08:53:32+00:00"
+            "time": "2022-03-10T06:26:14+00:00"
         }
     ],
     "packages-dev": [

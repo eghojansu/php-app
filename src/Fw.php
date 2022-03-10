@@ -93,7 +93,7 @@ class Fw
 
     public static function create(string $env = null, array $data = null, array $rules = null)
     {
-        return new self(
+        return new static(
             $env,
             new Di(
                 array_replace_recursive(
@@ -808,7 +808,7 @@ class Fw
         }
 
         if ($set = $exp ?? $expires ?? $jar['expires']) {
-            $cookie .= '; Expires=' . self::gmDate($set, $max) . '; Max-Age=' . $max;
+            $cookie .= '; Expires=' . static::gmDate($set, $max) . '; Max-Age=' . $max;
         }
 
         if ($set = $domain ?? $jar['domain']) {
@@ -948,7 +948,7 @@ class Fw
 
     public function status(int $code, bool $throw = true): static
     {
-        $text = self::statusText($code, $exists);
+        $text = static::statusText($code, $exists);
 
         if (!$exists && $throw) {
             throw new \LogicException($text);
@@ -1023,7 +1023,7 @@ class Fw
         $lastModified = filemtime($file);
         $modifiedSince = $this->headers('if_modified_since');
 
-        $this->addHeader('Last-Modified', self::gmDate($lastModified));
+        $this->addHeader('Last-Modified', static::gmDate($lastModified));
 
         if ($range) {
             $this->addHeader('Accept-Ranges', 'bytes');
