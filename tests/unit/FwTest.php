@@ -50,7 +50,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(80, $this->fw->getPort());
         $this->assertSame(null, $this->fw->getMime());
         $this->assertSame('UTF-8', $this->fw->getCharset());
-        $this->assertSame(false, $this->fw->isDev());
+        $this->assertSame(false, $this->fw->isDebug());
         $this->assertSame(false, $this->fw->isBuiltin());
         $this->assertSame(true, $this->fw->isCli());
         $this->assertSame(false, $this->fw->isContentType('json'));
@@ -61,6 +61,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('*/*', $this->fw->acceptBest());
         $this->assertSame('', $this->fw->getContentType());
         $this->assertSame('http://localhost', $this->fw->getBaseUrl());
+        $this->assertSame('prod', $this->fw->getEnv());
 
         // mutate
         $this->assertSame('post', $this->fw->setVerb('post')->getVerb());
@@ -77,9 +78,10 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(8080, $this->fw->setPort(8080)->getPort());
         $this->assertSame('text/html', $this->fw->setMime('text/html')->getMime());
         $this->assertSame('UTF-88', $this->fw->setCharset('UTF-88')->getCharset());
-        $this->assertSame(true, $this->fw->setDev(true)->isDev());
+        $this->assertSame(true, $this->fw->setDebug(true)->isDebug());
         $this->assertSame(true, $this->fw->setBuiltin(true)->isBuiltin());
         $this->assertSame('http://localhost/foo', $this->fw->setBaseUrl('http://localhost/foo')->getBaseUrl());
+        $this->assertSame('dev', $this->fw->setEnv('dev')->getEnv());
     }
 
     public function testResponse()
@@ -307,7 +309,7 @@ class FwTest extends \Codeception\Test\Unit
         $fw->setErrorTemplate('html', '[HTML] {message}');
 
         $fw->route('GET /', static fn() => 'home');
-        $fw->route('GET /is-dev', static fn(Fw $fw) => array('dev' => $fw->isDev()));
+        $fw->route('GET /is-debug', static fn(Fw $fw) => array('debug' => $fw->isDebug()));
         $fw->route('GET /foo/@bar/@baz', static fn($bar, $baz) => array($bar, $baz));
         $fw->route('POST /drink/@any*?', static fn($any = 'not thristy') => $any);
         $fw->route('GET @eater /eat/@foods* [name=eater,eat,drinks]', static function(Fw $fw, $foods) {
@@ -332,9 +334,9 @@ class FwTest extends \Codeception\Test\Unit
     {
         return array(
             'home' => array('home'),
-            'named' => array('{"dev":false}', array(
+            'named' => array('{"debug":false}', array(
                 'SERVER' => array(
-                    'REQUEST_URI' => '/is-dev',
+                    'REQUEST_URI' => '/is-debug',
                 ),
             )),
             'args' => array('["bar","baz"]', array(
@@ -358,7 +360,7 @@ class FwTest extends \Codeception\Test\Unit
                 ),
             )),
             'not found html' => array('[HTML] [404 - Not Found] GET /eat', array(
-                'DEV' => true,
+                'DEBUG' => true,
                 'CLI' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
@@ -407,7 +409,7 @@ class FwTest extends \Codeception\Test\Unit
     {
         $fw = Fw::create(array(
             'QUIET' => true,
-            'DEV' => true,
+            'DEBUG' => true,
             'SERVER' => array(
                 'REQUEST_URI' => '/none',
                 'HTTP_ACCEPT' => 'json',

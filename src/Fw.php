@@ -83,15 +83,14 @@ class Fw
     private $routes = array();
     private $aliases = array();
 
-    public function __construct(private Di $di, private Box $box)
+    public function __construct(private Di $di, private Box $box, private string|null $env = null)
     {
-        $this->di->setAlias('di');
         $this->di->inject($this, array('alias' => 'fw'));
         $this->di->inject($this->box, array('alias' => 'box'));
         $this->initialize();
     }
 
-    public static function create(array $data = null, array $rules = null)
+    public static function create(array $data = null, array $rules = null, string $env = null)
     {
         return new self(
             new Di(
@@ -105,6 +104,7 @@ class Fw
                 ),
             ),
             new Box($data),
+            $env,
         );
     }
 
@@ -191,14 +191,28 @@ class Fw
         return $this;
     }
 
-    public function isDev(): bool
+    public function getEnv(): string
     {
-        return $this->box['DEV'] ?? false;
+        return $this->env ?? 'prod';
     }
 
-    public function setDev(bool $dev): static
+    public function setEnv(string|null $env): static
     {
-        $this->box['DEV'] = $dev;
+        if ($env) {
+            $this->env = strtolower($env);
+        }
+
+        return $this;
+    }
+
+    public function isDebug(): bool
+    {
+        return $this->box['DEBUG'] ?? false;
+    }
+
+    public function setDebug(bool $debug): static
+    {
+        $this->box['DEBUG'] = $debug;
 
         return $this;
     }
@@ -1192,7 +1206,7 @@ class Fw
 
     private function errorBuild(ErrorEvent $error): string|array
     {
-        $dev = $this->isDev();
+        $debug = $this->isDebug();
         $data = array(
             'code' => $error->getCode(),
             'text' => $error->getText(),
@@ -1200,7 +1214,7 @@ class Fw
             'message' => $error->getMessage(),
         );
 
-        if ($dev) {
+        if ($debug) {
             $data['trace'] = $error->getTrace();
         }
 
@@ -1210,14 +1224,14 @@ class Fw
 
         $replace = $data;
         $replace['data'] = null;
-        $replace['trace'] = $dev ? implode("\n", $replace['trace']) : null;
+        $replace['trace'] = $debug ? implode("\n", $replace['trace']) : null;
 
         if ($this->isCli()) {
             $template = $this->getErrorTemplate('cli');
         } else {
             $template = $this->getErrorTemplate('html');
 
-            if ($dev) {
+            if ($debug) {
                 $replace['trace'] = '<pre>' . $replace['trace'] . '</pre>';
             }
         }
