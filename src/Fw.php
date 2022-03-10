@@ -207,7 +207,7 @@ class Fw
 
     public function isDebug(): bool
     {
-        return $this->box['DEBUG'] ?? false;
+        return $this->box['DEBUG'] ?? ($this->box['DEBUG'] = in_array($this->getEnv(), array('dev', 'development')));
     }
 
     public function setDebug(bool $debug): static
