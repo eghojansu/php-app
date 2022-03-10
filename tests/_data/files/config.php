@@ -4,6 +4,7 @@ use Ekok\Container\Box;
 
 return array(
     'foo' => 'bar',
+    'is_cli' => $fw->isCli(),
     '@routeAll' => array(
         array(
             'GET /' => static fn() => 'home',

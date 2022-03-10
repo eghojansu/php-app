@@ -165,7 +165,7 @@ class Fw
     public function load(string ...$files): static
     {
         array_walk($files, function (string $file) {
-            $data = File::load($file) ?? array();
+            $data = File::load($file, array('box' => $this->box, 'fw' => $this)) ?? array();
 
             array_walk($data, function ($value, $key) {
                 if ($value instanceof \Closure) {

@@ -764,6 +764,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('home', $this->fw->getOutput());
         $this->assertSame('bar', $box['foo']);
         $this->assertSame(true, $box['from_callable']);
+        $this->assertSame(true, $box['is_cli']);
         $this->assertInstanceOf('stdClass', $std = $di->make('foo'));
         $this->assertNotSame($std, $di->make('foo'));
         $this->assertNotSame($std, $di->make('stdClass'));
