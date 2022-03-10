@@ -16,7 +16,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function _before()
     {
-        $this->fw = Fw::create(array('QUIET' => true));
+        $this->fw = Fw::create(null, array('QUIET' => true));
 
         header_remove();
     }
@@ -178,7 +178,7 @@ class FwTest extends \Codeception\Test\Unit
     /** @dataProvider sendFileProvider */
     public function testSendFile(array|string $expected, array $env = null, ...$args)
     {
-        $fw = Fw::create($env);
+        $fw = Fw::create(null, $env);
 
         list($output, $code) = ((array) $expected) + array('', 200);
 
@@ -304,7 +304,7 @@ class FwTest extends \Codeception\Test\Unit
     /** @dataProvider runProvider */
     public function testRun($expected, array $env = null)
     {
-        $fw = Fw::create(($env ?? array()) + array('QUIET' => true));
+        $fw = Fw::create(null, ($env ?? array()) + array('QUIET' => true));
         $fw->setErrorTemplate('cli', '[CLI] {message}');
         $fw->setErrorTemplate('html', '[HTML] {message}');
 
@@ -407,7 +407,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRunErrorJson()
     {
-        $fw = Fw::create(array(
+        $fw = Fw::create(null, array(
             'QUIET' => true,
             'DEBUG' => true,
             'SERVER' => array(
@@ -488,7 +488,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testUrl()
     {
-        $fw = Fw::create(array(
+        $fw = Fw::create(null, array(
             'CLI' => false,
             'SERVER' => array(
                 'REQUEST_URI' => '/basedir/front.php/path',
@@ -551,7 +551,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testHeaders()
     {
-        $fw = Fw::create(array(
+        $fw = Fw::create(null, array(
             'SERVER' => array(
                 'CONTENT_TYPE' => 'text/plain',
                 'HTTP_ACCEPT' => 'json',
@@ -600,7 +600,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testLogged()
     {
-        $fw = Fw::create(array(
+        $fw = Fw::create(null, array(
             'QUIET' => true,
         ), array(
             Log::class => array(
