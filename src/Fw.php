@@ -1363,6 +1363,10 @@ class Fw
             }
         });
 
+        if (self::class !== static::class) {
+            $this->di->addAlias(self::class, static::class);
+        }
+
         $this->box['ERROR_TEMPLATE']['html'] =
         <<<'HTML'
 <!doctype html>

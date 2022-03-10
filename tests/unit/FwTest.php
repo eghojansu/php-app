@@ -771,4 +771,13 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertNotSame($std, $di->make('foo'));
         $this->assertNotSame($std, $di->make('stdClass'));
     }
+
+    public function testExtending()
+    {
+        $fw = FwExt::create();
+        $di = $fw->getContainer();
+
+        $this->assertSame($fw, $di->make(Fw::class));
+        $this->assertSame($di->make(FwExt::class), $di->make(Fw::class));
+    }
 }

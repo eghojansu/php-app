@@ -15,6 +15,9 @@
             "Ekok\\App\\": "src/"
         }
     },
+    "autoload-dev": {
+        "classmap": ["tests/_data/classes"]
+    },
     "require": {
         "php": ">=8.0",
         "ekok/php-utils": "dev-master",
