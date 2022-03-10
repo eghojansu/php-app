@@ -58,12 +58,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-container.git",
-                "reference": "64dbe637e6ecb4a850ded62d5bda7f63fbf08bc4"
+                "reference": "ea212248386c3f6116de28c7abbd6ced86e42519"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/64dbe637e6ecb4a850ded62d5bda7f63fbf08bc4",
-                "reference": "64dbe637e6ecb4a850ded62d5bda7f63fbf08bc4",
+                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/ea212248386c3f6116de28c7abbd6ced86e42519",
+                "reference": "ea212248386c3f6116de28c7abbd6ced86e42519",
                 "shasum": ""
             },
             "require": {
@@ -97,7 +97,7 @@
                 "issues": "https://github.com/eghojansu/php-container/issues",
                 "source": "https://github.com/eghojansu/php-container/tree/master"
             },
-            "time": "2022-03-09T09:37:09+00:00"
+            "time": "2022-03-10T08:24:37+00:00"
         },
         {
             "name": "ekok/php-event-dispatcher",

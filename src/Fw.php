@@ -85,7 +85,7 @@ class Fw
 
     public function __construct(private string|null $env, private Di $di, private Box $box)
     {
-        $this->di->inject($this, array('alias' => 'fw', 'name' => self::class));
+        $this->di->inject($this, array('alias' => 'fw', 'name' => static::class));
         $this->di->inject($this->box, array('alias' => 'box', 'name' => Box::class));
 
         $this->initialize();
