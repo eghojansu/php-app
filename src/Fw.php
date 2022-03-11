@@ -85,10 +85,9 @@ class Fw
     private $routes = array();
     private $aliases = array();
 
-    public function __construct(private string|null $env, private Di $di, private Box $box)
+    public function __construct(private string|null $env, private Di $di, private array|null $data = null)
     {
         $this->di->inject($this, array('alias' => 'fw', 'name' => static::class));
-        $this->di->inject($this->box, array('alias' => 'box', 'name' => Box::class));
 
         $this->initialize();
     }
@@ -100,6 +99,7 @@ class Fw
             new Di(
                 array_replace_recursive(
                     array(
+                        Box::class => array('shared' => true, 'inherit' => false, 'alias' => 'box'),
                         Log::class => array('shared' => true, 'inherit' => false, 'alias' => 'log'),
                         Cache::class => array('shared' => true, 'inherit' => false, 'alias' => 'cache'),
                         Dispatcher::class => array('shared' => true, 'inherit' => false, 'alias' => 'dispatcher'),
@@ -107,7 +107,7 @@ class Fw
                     $rules ?? array(),
                 ),
             ),
-            new Box($data),
+            $data,
         );
     }
 
@@ -140,22 +140,22 @@ class Fw
 
     public function getBox(): Box
     {
-        return $this->box;
+        return $this->di->make('box');
     }
 
     public function getLog(): Log
     {
-        return $this->di->make(Log::class);
+        return $this->di->make('log');
     }
 
     public function getCache(): Cache
     {
-        return $this->di->make(Cache::class);
+        return $this->di->make('cache');
     }
 
     public function getDispatcher(): Dispatcher
     {
-        return $this->di->make(Dispatcher::class);
+        return $this->di->make('dispatcher');
     }
 
     public function chain(callable|string $cb): static
@@ -165,10 +165,15 @@ class Fw
         return $this;
     }
 
+    public function getData(string $key = null)
+    {
+        return $key ? ($this->data[$key] ?? null) : $this->data;
+    }
+
     public function load(string ...$files): static
     {
         array_walk($files, function (string $file) {
-            $data = File::load($file, array('box' => $this->box, 'fw' => $this)) ?? array();
+            $data = File::load($file, array('fw' => $this)) ?? array();
 
             array_walk($data, function ($value, $key) {
                 if ($value instanceof \Closure) {
@@ -186,7 +191,7 @@ class Fw
 
                     $this->di->callArguments($norm, $value);
                 } else {
-                    $this->box->set($key, $value);
+                    $this->getBox()->set($key, $value);
                 }
             });
         });
@@ -201,40 +206,50 @@ class Fw
 
     public function setEnv(string|null $env): static
     {
-        if ($env) {
-            $this->env = strtolower($env);
-        }
+        $this->env = $env ? strtolower($env) : null;
+
+        return $this;
+    }
+
+    public function getProjectDir(): string|null
+    {
+        return $this->data['project_dir'] ?? null;
+    }
+
+    public function setProjectDir(string $projectDir): static
+    {
+        $this->data['project_dir'] = rtrim(Str::fixslashes($projectDir), '/');
 
         return $this;
     }
 
     public function isDebug(): bool
     {
-        return $this->box['DEBUG'] ?? ($this->box['DEBUG'] = in_array($this->getEnv(), array('dev', 'development')));
+        return $this->data['debug'] ?? ($this->data['debug'] = in_array($this->getEnv(), array('dev', 'development')));
     }
 
     public function setDebug(bool $debug): static
     {
-        $this->box['DEBUG'] = $debug;
+        $this->data['debug'] = $debug;
 
         return $this;
     }
 
     public function isBuiltin(): bool
     {
-        return $this->box['BUILTIN'] ?? ($this->box['BUILTIN'] = 'cli-server' === PHP_SAPI);
+        return $this->data['builtin'] ?? ($this->data['builtin'] = 'cli-server' === PHP_SAPI);
     }
 
     public function setBuiltin(bool $builtin): static
     {
-        $this->box['BUILTIN'] = $builtin;
+        $this->data['builtin'] = $builtin;
 
         return $this;
     }
 
     public function isCli(): bool
     {
-        return $this->box['CLI'] ?? ($this->box['CLI'] = 'cli' === PHP_SAPI);
+        return $this->data['cli'] ?? ($this->data['cli'] = 'cli' === PHP_SAPI);
     }
 
     public function run(): static
@@ -343,12 +358,12 @@ class Fw
 
     public function uri(bool $absolute = true): string
     {
-        return $this->url($this->getPath(), $this->box['GET'] ?? array(), $absolute);
+        return $this->url($this->getPath(), $this->data['GET'] ?? array(), $absolute);
     }
 
     public function getMatch(string $key = null, array|string|callable|null $default = null): array|string|callable|null
     {
-        return $key ? ($this->box['MATCH'][$key] ?? $default) : ($this->box['MATCH'] ?? null);
+        return $key ? ($this->data['match'][$key] ?? $default) : ($this->data['match'] ?? null);
     }
 
     public function getAliases(): array
@@ -408,8 +423,8 @@ class Fw
 
     public function getContentType(): string
     {
-        return $this->box['CONTENTTYPE'] ?? (
-            $this->box['CONTENTTYPE'] = $this->box['SERVER']['CONTENT_TYPE'] ?? ''
+        return $this->data['contenttype'] ?? (
+            $this->data['contenttype'] = $this->data['SERVER']['CONTENT_TYPE'] ?? ''
         );
     }
 
@@ -430,12 +445,12 @@ class Fw
 
     public function isRaw(): bool
     {
-        return $this->box['RAW'] ?? false;
+        return $this->data['raw'] ?? false;
     }
 
     public function setRaw(bool $raw): static
     {
-        $this->box['RAW'] = $raw;
+        $this->data['raw'] = $raw;
 
         return $this;
     }
@@ -447,14 +462,39 @@ class Fw
 
     public function getBody(): string|null
     {
-        return $this->box['BODY'] ?? ($this->box['BODY'] = $this->isRaw() ? null : file_get_contents('php://input'));
+        return $this->data['body'] ?? ($this->data['body'] = $this->isRaw() ? null : file_get_contents('php://input'));
     }
 
     public function setBody(string $body): static
     {
-        $this->box['BODY'] = $body;
+        $this->data['body'] = $body;
 
         return $this;
+    }
+
+    public function getPost(): array
+    {
+        return $this->data['POST'];
+    }
+
+    public function getQueries(): array
+    {
+        return $this->data['GET'];
+    }
+
+    public function getFiles(): array
+    {
+        return $this->data['FILES'];
+    }
+
+    public function getServer(): array
+    {
+        return $this->data['SERVER'];
+    }
+
+    public function getServerEnv(): array
+    {
+        return $this->data['ENV'];
     }
 
     public function wantsJson(): bool
@@ -474,7 +514,7 @@ class Fw
 
     public function headers(string $key = null): array|string|null
     {
-        $srv = $this->box['SERVER'] ?? array();
+        $srv = $this->data['SERVER'] ?? array();
 
         if ($key) {
             $key_ = strtoupper(str_replace('-', '_', $key));
@@ -498,19 +538,19 @@ class Fw
 
     public function getBasePath(): string
     {
-        return $this->box['BASEPATH'] ?? ($this->box['BASEPATH'] = $this->isBuiltin() || $this->isCli() ? '' : Str::fixslashes(dirname($this->box['SERVER']['SCRIPT_NAME'] ?? '')));
+        return $this->data['basepath'] ?? ($this->data['basepath'] = $this->isBuiltin() || $this->isCli() ? '' : Str::fixslashes(dirname($this->data['SERVER']['SCRIPT_NAME'] ?? '')));
     }
 
     public function setBasePath(string $basePath): static
     {
-        $this->box['BASEPATH'] = ($basePath && '/' !== $basePath[0] ? '/' : '') . $basePath;
+        $this->data['basepath'] = ($basePath && '/' !== $basePath[0] ? '/' : '') . $basePath;
 
         return $this;
     }
 
     public function getBaseUrl(): string
     {
-        return $this->box['BASEURL'] ?? ($this->box['BASEURL'] = (
+        return $this->data['baseurl'] ?? ($this->data['baseurl'] = (
                 $this->getScheme() .
                 '://' .
                 $this->getHost() .
@@ -522,126 +562,126 @@ class Fw
 
     public function setBaseUrl(string $baseUrl): static
     {
-        $this->box['BASEURL'] = $baseUrl;
+        $this->data['baseurl'] = $baseUrl;
 
         return $this;
     }
 
     public function getPath(): string
     {
-        if (null === ($this->box['PATH'] ?? null)) {
+        if (null === ($this->data['path'] ?? null)) {
             $entry = $this->getEntry();
             $basePath = $this->getBasePath();
-            $uri = rawurldecode(strstr(($this->box['SERVER']['REQUEST_URI'] ?? '') . '?', '?', true));
+            $uri = rawurldecode(strstr(($this->data['SERVER']['REQUEST_URI'] ?? '') . '?', '?', true));
             $base = $entry ? rtrim($basePath . '/' . $entry, '/') : $basePath;
 
-            $this->box['PATH'] = urldecode('/' . ltrim('' === $base ? $uri : preg_replace("#^{$base}#", '', $uri, 1), '/'));
+            $this->data['path'] = urldecode('/' . ltrim('' === $base ? $uri : preg_replace("#^{$base}#", '', $uri, 1), '/'));
         }
 
-        return $this->box['PATH'];
+        return $this->data['path'];
     }
 
     public function setPath(string $path): static
     {
-        $this->box['PATH'] = ('/' !== ($path[0] ?? '') ? '/' : '') . $path;
+        $this->data['path'] = ('/' !== ($path[0] ?? '') ? '/' : '') . $path;
 
         return $this;
     }
 
     public function isSecure(): bool
     {
-        return $this->box['SECURE'] ?? ($this->box['SECURE'] = !!($this->box['SERVER']['HTTPS'] ?? null));
+        return $this->data['secure'] ?? ($this->data['secure'] = !!($this->data['SERVER']['HTTPS'] ?? null));
     }
 
     public function setSecure(bool $secure): static
     {
-        $this->box['SECURE'] = $secure;
+        $this->data['secure'] = $secure;
 
         return $this;
     }
 
     public function getScheme(): string
     {
-        return $this->box['SCHEME'] ?? ($this->box['SCHEME'] = $this->isSecure() ? 'https' : 'http');
+        return $this->data['scheme'] ?? ($this->data['scheme'] = $this->isSecure() ? 'https' : 'http');
     }
 
     public function setScheme(string $scheme): static
     {
-        $this->box['SCHEME'] = $scheme;
+        $this->data['scheme'] = $scheme;
 
         return $this;
     }
 
     public function getHost(): string
     {
-        return $this->box['HOST'] ?? ($this->box['HOST'] = strstr(($this->box['SERVER']['HTTP_HOST'] ?? 'localhost') . ':', ':', true));
+        return $this->data['host'] ?? ($this->data['host'] = strstr(($this->data['SERVER']['HTTP_HOST'] ?? 'localhost') . ':', ':', true));
     }
 
     public function setHost(string $host): static
     {
-        $this->box['HOST'] = $host;
+        $this->data['host'] = $host;
 
         return $this;
     }
 
     public function getPort(): int
     {
-        return $this->box['PORT'] ?? ($this->box['PORT'] = intval($this->box['SERVER']['SERVER_PORT'] ?? 80));
+        return $this->data['port'] ?? ($this->data['port'] = intval($this->data['SERVER']['SERVER_PORT'] ?? 80));
     }
 
     public function setPort(string|int $port): static
     {
-        $this->box['PORT'] = intval($port);
+        $this->data['port'] = intval($port);
 
         return $this;
     }
 
     public function getEntry(): string|null
     {
-        return $this->box['ENTRY'] ?? ($this->box['ENTRY'] = $this->isBuiltin() || $this->isCli() ? '' : basename($this->box['SERVER']['SCRIPT_NAME'] ?? ''));
+        return $this->data['entry'] ?? ($this->data['entry'] = $this->isBuiltin() || $this->isCli() ? '' : basename($this->data['SERVER']['SCRIPT_NAME'] ?? ''));
     }
 
     public function setEntry(string|null $entry): static
     {
-        $this->box['ENTRY'] = $entry;
+        $this->data['entry'] = $entry;
 
         return $this;
     }
 
     public function getVerb(): string
     {
-        return $this->box['VERB'] ?? (
-            $this->box['VERB'] = $this->box['SERVER']['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $this->box['POST']['_method'] ?? $this->box['SERVER']['REQUEST_METHOD'] ?? 'GET'
+        return $this->data['verb'] ?? (
+            $this->data['verb'] = $this->data['SERVER']['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $this->data['POST']['_method'] ?? $this->data['SERVER']['REQUEST_METHOD'] ?? 'GET'
         );
     }
 
     public function setVerb(string $verb): static
     {
-        $this->box['VERB'] = $verb;
+        $this->data['verb'] = $verb;
 
         return $this;
     }
 
     public function getProtocol(): string
     {
-        return $this->box['PROTOCOL'] ?? ($this->box['PROTOCOL'] = $this->box['SERVER']['SERVER_PROTOCOL'] ?? 'HTTP/1.1');
+        return $this->data['protocol'] ?? ($this->data['protocol'] = $this->data['SERVER']['SERVER_PROTOCOL'] ?? 'HTTP/1.1');
     }
 
     public function setProtocol(string $protocol): static
     {
-        $this->box['PROTOCOL'] = $protocol;
+        $this->data['protocol'] = $protocol;
 
         return $this;
     }
 
     public function getMime(): string|null
     {
-        return $this->box['MIME'] ?? null;
+        return $this->data['mime'] ?? null;
     }
 
     public function setMime(string $mime): static
     {
-        $this->box['MIME'] = $mime;
+        $this->data['mime'] = $mime;
 
         return $this;
     }
@@ -649,24 +689,24 @@ class Fw
     public function getMimeFile(string $file): string
     {
         $ext = ltrim(strrchr('.' . $file, '.'), '.');
-        $list = $this->box['MIME_LIST'][$ext] ?? $this->box['MIME_LIST'][strtolower($ext)] ?? 'application/octet-stream';
+        $list = $this->data['mime_list'][$ext] ?? $this->data['mime_list'][strtolower($ext)] ?? 'application/octet-stream';
 
         return is_array($list) ? reset($list) : $list;
     }
 
     public function getMimeList(): array
     {
-        return $this->box['MIME_LIST'] ?? array();
+        return $this->data['mime_list'] ?? array();
     }
 
     public function setMimeList(array $mimeList, bool $replace = true): static
     {
         if ($replace) {
-            $this->box['MIME_LIST'] = array();
+            $this->data['mime_list'] = array();
         }
 
         array_walk($mimeList, function (string|array $mime, string $ext) {
-            $this->box['MIME_LIST'][strtolower($ext)] = $mime;
+            $this->data['mime_list'][strtolower($ext)] = $mime;
         });
 
         return $this;
@@ -674,12 +714,12 @@ class Fw
 
     public function getCharset(): string|null
     {
-        return $this->box['CHARSET'] ?? ($this->box['CHARSET'] = 'UTF-8');
+        return $this->data['charset'] ?? ($this->data['charset'] = 'UTF-8');
     }
 
     public function setCharset(string $charset): static
     {
-        $this->box['CHARSET'] = $charset;
+        $this->data['charset'] = $charset;
 
         return $this;
     }
@@ -688,12 +728,12 @@ class Fw
     {
         $found = array();
 
-        if (isset($this->box['HEADERS'][$name])) {
+        if (isset($this->data['headers'][$name])) {
             $found = array($name);
         } else {
             $found = preg_grep(
                 '/^' . preg_quote($name, '/') . '$/i',
-                array_keys($this->box['HEADERS'] ?? array()),
+                array_keys($this->data['headers'] ?? array()),
             ) ?: array();
         }
 
@@ -704,14 +744,14 @@ class Fw
     {
         return Arr::reduce(
             $this->hasHeader($key, $found) ? $found : array(),
-            fn(array $headers, string $header) => array_merge($headers, $this->box['HEADERS'][$header]),
+            fn(array $headers, string $header) => array_merge($headers, $this->data['headers'][$header]),
             array(),
         );
     }
 
     public function getHeaders(): array
     {
-        return $this->box['HEADERS'] ?? array();
+        return $this->data['headers'] ?? array();
     }
 
     public function addHeader(string $name, $value, bool $replace = true): static
@@ -719,14 +759,14 @@ class Fw
         if ($replace) {
             $this->removeHeaders($name);
 
-            $this->box['HEADERS'][$name] = (array) $value;
+            $this->data['headers'][$name] = (array) $value;
         } else {
             if (is_array($value)) {
                 array_walk($value, function ($value) use ($name) {
-                    $this->box['HEADERS'][$name][] = $value;
+                    $this->data['headers'][$name][] = $value;
                 });
             } else {
-                $this->box['HEADERS'][$name][] = $value;
+                $this->data['headers'][$name][] = $value;
             }
         }
 
@@ -736,7 +776,7 @@ class Fw
     public function setHeaders(array $headers, bool $replace = false): static
     {
         if ($replace) {
-            $this->box['HEADERS'] = array();
+            $this->data['headers'] = array();
         }
 
         array_walk($headers, function ($value, $name) {
@@ -752,7 +792,7 @@ class Fw
             $this->hasHeader($key, $found);
 
             array_walk($found, function ($key) {
-                unset($this->box['HEADERS'][$key]);
+                unset($this->data['headers'][$key]);
             });
         });
 
@@ -761,7 +801,7 @@ class Fw
 
     public function getCookieJar(): array
     {
-        return $this->box['COOKIE_JAR'] ?? array(
+        return $this->data['cookie_jar'] ?? array(
             'expires' => null,
             'path' => $this->getBasePath(),
             'domain' => $this->getHost(),
@@ -774,14 +814,14 @@ class Fw
 
     public function setCookieJar(array $jar): static
     {
-        $this->box['COOKIE_JAR'] = array_replace($this->getCookieJar(), $jar);
+        $this->data['cookie_jar'] = array_replace($this->getCookieJar(), $jar);
 
         return $this;
     }
 
     public function getCookie(string $name = null)
     {
-        return $name ? ($this->box['COOKIE'][$name] ?? null) : $this->box['COOKIE'];
+        return $name ? ($this->data['COOKIE'][$name] ?? null) : $this->data['COOKIE'];
     }
 
     public function setCookie(
@@ -801,12 +841,12 @@ class Fw
         if ($value) {
             $cookie .= ($raw ?? $jar['raw']) ? urlencode($value) : $value;
 
-            $this->box['COOKIE'][$name] = $value;
+            $this->data['COOKIE'][$name] = $value;
         } else {
             $exp = -2592000;
             $cookie .= 'deleted';
 
-            unset($this->box['COOKIE'][$name]);
+            unset($this->data['COOKIE'][$name]);
         }
 
         if ($set = $exp ?? $expires ?? $jar['expires']) {
@@ -855,26 +895,63 @@ class Fw
         return $this->setCookie($name, null, null, $path, $domain, $secure, $httponly, $samesite);
     }
 
-    public function getSession(string $name = null)
+    public function session(string $name = null, ...$sets)
     {
-        return $name ? ($this->box['SESSION'][$name] ?? null) : $this->box['SESSION'];
+        (PHP_SESSION_ACTIVE === session_status() || $this->sent()) || session_start();
+
+        if (!isset($this->data['session'])) {
+            $this->data['session'] = &$GLOBALS['_SESSION'];
+        }
+
+        if ($name) {
+            if ($sets) {
+                $this->data['session'][$name] = $sets[0];
+            }
+
+            return $this->data['session'][$name] ?? null;
+        }
+
+        return $this->data['session'];
     }
 
     public function flashSession(string $name)
     {
-        return $this->box->cut('SESSION.' . $name);
+        $value = $this->session($name);
+
+        unset($this->data['session'][$name]);
+
+        return $value;
+    }
+
+    public function getSession(string $name = null)
+    {
+        return $this->session($name);
     }
 
     public function setSession(string $name, $value): static
     {
-        $this->box['SESSION'][$name] = $value;
+        $this->session($name, $value);
+
+        return $this;
+    }
+
+    public function removeSession(string $name = null): static
+    {
+        $this->session();
+
+        if ($name) {
+            unset($this->data['session'][$name]);
+        } else {
+            session_unset();
+            session_destroy();
+        }
 
         return $this;
     }
 
     public function getOutput(): string|null
     {
-        return $this->box['OUTPUT'] ?? null;
+        return $this->data['output'] ?? null;
     }
 
     public function setOutput($value, string $mime = null): static
@@ -889,38 +966,38 @@ class Fw
             $this->setMime($mime ?? $setMime);
         }
 
-        $this->box['OUTPUT'] = $setOutput;
+        $this->data['output'] = $setOutput;
 
         return $this;
     }
 
     public function isQuiet(): bool
     {
-        return $this->box['QUIET'] ?? false;
+        return $this->data['quiet'] ?? false;
     }
 
     public function setQuiet(bool $quiet): static
     {
-        $this->box['QUIET'] = $quiet;
+        $this->data['quiet'] = $quiet;
 
         return $this;
     }
 
     public function isBuffering(): bool
     {
-        return $this->box['BUFFERING'] ?? true;
+        return $this->data['buffering'] ?? true;
     }
 
     public function setBuffering(bool $buffering): static
     {
-        $this->box['BUFFERING'] = $buffering;
+        $this->data['buffering'] = $buffering;
 
         return $this;
     }
 
     public function getBufferingLevel(): int|null
     {
-        return $this->box['BUFFERING_LEVEL'] ?? null;
+        return $this->data['buffering_level'] ?? null;
     }
 
     public function stopBuffering(): array
@@ -932,7 +1009,7 @@ class Fw
                 $buffers[] = ob_get_clean();
             }
 
-            $this->box['BUFFERING_LEVEL'] = null;
+            $this->data['buffering_level'] = null;
         }
 
         return $buffers;
@@ -940,12 +1017,12 @@ class Fw
 
     public function code(): int|null
     {
-        return $this->box['CODE'] ?? null;
+        return $this->data['code'] ?? null;
     }
 
     public function text(): string|null
     {
-        return $this->box['TEXT'] ?? null;
+        return $this->data['text'] ?? null;
     }
 
     public function status(int $code, bool $throw = true): static
@@ -956,15 +1033,15 @@ class Fw
             throw new \LogicException($text);
         }
 
-        $this->box['TEXT'] = $text;
-        $this->box['CODE'] = $code;
+        $this->data['text'] = $text;
+        $this->data['code'] = $code;
 
         return $this;
     }
 
     public function sent(): bool
     {
-        return $this->box['SENT'] ?? ($this->box['SENT'] = headers_sent());
+        return $this->data['sent'] ?? ($this->data['sent'] = headers_sent());
     }
 
     public function send($value = null, array $headers = null, int $status = null, string|null $mime = null, int $kbps = null): static
@@ -992,7 +1069,7 @@ class Fw
             $this->addHeader('Content-Length', strlen($output));
         }
 
-        foreach ($this->box['HEADERS'] ?? array() as $name => $headers) {
+        foreach ($this->data['headers'] ?? array() as $name => $headers) {
             $set = ucwords($name, '-') . ': ';
             $replace = empty($headers[1]);
 
@@ -1011,7 +1088,7 @@ class Fw
             $this->shoutText($output, $kbps);
         }
 
-        $this->box['SENT'] = true;
+        $this->data['sent'] = true;
 
         return $this;
     }
@@ -1141,19 +1218,22 @@ class Fw
 
     public function getRenderSetup(): array
     {
-        return $this->box['RENDER'] ?? array();
+        return $this->data['render'] ?? array(
+            'directories' => array(),
+            'extensions' => array('.php'),
+        );
     }
 
     public function setRenderSetup(string|array $directories, string|array $extensions = null): static
     {
-        $this->box['RENDER'] = array(
+        $this->data['render'] = array(
             'directories' => array_map(
                 static fn(string $dir) => rtrim(Str::fixslashes($dir), '/') . '/',
                 Arr::ensure($directories),
             ),
             'extensions' => array_map(
                 static fn(string $ext) => '.' . trim($ext, '.'),
-                Arr::ensure($extensions),
+                Arr::ensure($extensions ?? array('.php')),
             ),
         );
 
@@ -1167,11 +1247,11 @@ class Fw
             file_exists($found = $file)
             || (
                 $found = Arr::first(
-                    $setup['directories'] ?? array(),
+                    $setup['directories'],
                     fn (string $dir) => (
                         file_exists($found = $dir . $file)
                         || ($found = Arr::first(
-                            $setup['extensions'] ?? array('.php'),
+                            $setup['extensions'],
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
                                 || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
@@ -1197,12 +1277,12 @@ class Fw
 
     public function getErrorTemplate(string $name = null): string|null
     {
-        return $this->box['ERROR_TEMPLATE'][$name] ?? $this->box['ERROR_TEMPLATE'][strtolower($name)] ?? null;
+        return $this->data['error_template'][$name] ?? $this->data['error_template'][strtolower($name)] ?? null;
     }
 
     public function setErrorTemplate(string $name, string $template): static
     {
-        $this->box['ERROR_TEMPLATE'][strtolower($name)] = $template;
+        $this->data['error_template'][strtolower($name)] = $template;
 
         return $this;
     }
@@ -1321,7 +1401,7 @@ class Fw
             throw new HttpException(404);
         }
 
-        $this->box['MATCH'] = $match;
+        $this->data['match'] = $match;
 
         list($result, $output) = $this->runHandle($match['handler'], $match['args']);
 
@@ -1331,7 +1411,7 @@ class Fw
     private function runHandle(string|callable $handler, array|null $args): array
     {
         if ($this->isBuffering()) {
-            $this->box['BUFFERING_LEVEL'] = ob_get_level();
+            $this->data['buffering_level'] = ob_get_level();
 
             ob_start();
         }
@@ -1360,8 +1440,8 @@ class Fw
         $globals = explode('|', self::VAR_GLOBALS);
 
         array_walk($globals, function ($global) {
-            if (!isset($this->box[$global])) {
-                $this->box[$global] = $GLOBALS['_' . $global] ?? array();
+            if (!isset($this->data[$global])) {
+                $this->data[$global] = $GLOBALS['_' . $global] ?? array();
             }
         });
 
@@ -1369,7 +1449,7 @@ class Fw
             $this->di->addAlias(self::class, static::class);
         }
 
-        $this->box['ERROR_TEMPLATE']['html'] =
+        $this->data['error_template']['html'] =
         <<<'HTML'
 <!doctype html>
 <html lang="en">
@@ -1387,27 +1467,12 @@ class Fw
   </body>
 </html>
 HTML;
-        $this->box['ERROR_TEMPLATE']['cli'] =
+        $this->data['error_template']['cli'] =
         <<<'TEXT'
 {code} - {text}
 {message}
 {trace}
 
 TEXT;
-        $this->box->beforeRef(function ($key, array &$data) {
-            if (is_string($key) && 0 === strpos($key, 'SESSION')) {
-                (PHP_SESSION_ACTIVE === session_status() || $this->sent()) || session_start();
-
-                if (!isset($data['SESSION'])) {
-                    $data['SESSION'] = &$GLOBALS['_SESSION'];
-                }
-            }
-        });
-        $this->box->beforeUnref(function ($key) {
-            if (is_string($key) && 0 === strpos($key, 'SESSION')) {
-                session_unset();
-                session_destroy();
-            }
-        });
     }
 }

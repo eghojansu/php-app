@@ -16,7 +16,7 @@ class FwTest extends \Codeception\Test\Unit
 
     public function _before()
     {
-        $this->fw = Fw::create(null, array('QUIET' => true));
+        $this->fw = Fw::create(null, array('quiet' => true));
 
         header_remove();
     }
@@ -39,6 +39,12 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testInitializationAndState()
     {
+        $this->assertArrayHasKey('SERVER', $this->fw->getData());
+        $this->assertSame(array(), $this->fw->getPost());
+        $this->assertSame(array(), $this->fw->getQueries());
+        $this->assertSame(array(), $this->fw->getFiles());
+        $this->assertSame($_SERVER, $this->fw->getServer());
+        $this->assertSame($_ENV, $this->fw->getServerEnv());
         $this->assertSame('GET', $this->fw->getVerb());
         $this->assertSame('/', $this->fw->getPath());
         $this->assertSame('', $this->fw->getBasePath());
@@ -62,6 +68,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('', $this->fw->getContentType());
         $this->assertSame('http://localhost', $this->fw->getBaseUrl());
         $this->assertSame('prod', $this->fw->getEnv());
+        $this->assertSame(null, $this->fw->getProjectDir());
 
         // mutate
         $this->assertSame('post', $this->fw->setVerb('post')->getVerb());
@@ -82,6 +89,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(true, $this->fw->setBuiltin(true)->isBuiltin());
         $this->assertSame('http://localhost/foo', $this->fw->setBaseUrl('http://localhost/foo')->getBaseUrl());
         $this->assertSame('dev', $this->fw->setEnv('dev')->getEnv());
+        $this->assertSame('dev', $this->fw->setProjectDir('dev//')->getProjectDir());
     }
 
     public function testResponse()
@@ -304,7 +312,7 @@ class FwTest extends \Codeception\Test\Unit
     /** @dataProvider runProvider */
     public function testRun($expected, array $env = null)
     {
-        $fw = Fw::create(null, ($env ?? array()) + array('QUIET' => true));
+        $fw = Fw::create(null, ($env ?? array()) + array('quiet' => true));
         $fw->setErrorTemplate('cli', '[CLI] {message}');
         $fw->setErrorTemplate('html', '[HTML] {message}');
 
@@ -360,8 +368,8 @@ class FwTest extends \Codeception\Test\Unit
                 ),
             )),
             'not found html' => array('[HTML] [404 - Not Found] GET /eat', array(
-                'DEBUG' => true,
-                'CLI' => false,
+                'debug' => true,
+                'cli' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
                 ),
@@ -389,7 +397,7 @@ class FwTest extends \Codeception\Test\Unit
                 ),
             )),
             'with limiter' => array('it is actually limited by 100 kbps', array(
-                'QUIET' => false,
+                'quiet' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/limited',
                 ),
@@ -408,8 +416,8 @@ class FwTest extends \Codeception\Test\Unit
     public function testRunErrorJson()
     {
         $fw = Fw::create(null, array(
-            'QUIET' => true,
-            'DEBUG' => true,
+            'quiet' => true,
+            'debug' => true,
             'SERVER' => array(
                 'REQUEST_URI' => '/none',
                 'HTTP_ACCEPT' => 'json',
@@ -489,7 +497,7 @@ class FwTest extends \Codeception\Test\Unit
     public function testUrl()
     {
         $fw = Fw::create(null, array(
-            'CLI' => false,
+            'cli' => false,
             'SERVER' => array(
                 'REQUEST_URI' => '/basedir/front.php/path',
                 'SCRIPT_NAME' => '/basedir/front.php',
@@ -533,8 +541,8 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRenderError()
     {
-        $this->expectException('LogicException');
-        $this->expectExceptionMessageMatches('/Error while loading: .+\/error.php \(Error from template\)/');
+        $this->expectException('RuntimeException');
+        $this->expectExceptionMessageMatches('/Error in file: .+\/error.php \(Error from template\)/');
 
         $this->fw->setRenderSetup(TEST_DATA . '/files');
         $this->fw->render('error.php');
@@ -577,31 +585,10 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('application/octet-stream', $this->fw->getMimeFile('foo.txt'));
     }
 
-    public function testBoxListener()
-    {
-        $box = $this->fw->getBox();
-
-        $this->assertSame(array(), $box['COOKIE']);
-        $this->assertSame(array(), $box['SESSION']);
-
-        $box['SESSION.foo'] = 'bar';
-
-        $this->assertSame('bar', $box['SESSION.foo']);
-        $this->assertSame($_SESSION['foo'], $box['SESSION.foo']);
-        $this->assertSame('bar', $box->cut('SESSION.foo'));
-        $this->assertSame(array(), $box['SESSION']);
-        $this->assertSame($_SESSION, $box['SESSION']);
-
-        $box->remove('SESSION');
-
-        $this->assertSame(array(), $box['SESSION']);
-        $this->assertSame($_SESSION, $box['SESSION']);
-    }
-
     public function testLogged()
     {
         $fw = Fw::create(null, array(
-            'QUIET' => true,
+            'quiet' => true,
         ), array(
             Log::class => array(
                 'params' => array(
@@ -744,13 +731,21 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertEmpty($this->fw->getSession());
 
         $this->fw->setSession('foo', 'bar');
+        $this->fw->setSession('bar', 'baz');
+        $this->fw->setSession('baz', 'qux');
 
         $this->assertSame('bar', $this->fw->getSession('foo'));
-        $this->assertSame(array('foo' => 'bar'), $this->fw->getSession());
+        $this->assertSame(array('foo' => 'bar', 'bar' => 'baz', 'baz' => 'qux'), $this->fw->getSession());
         $this->assertSame($_SESSION, $this->fw->getSession());
         $this->assertSame($GLOBALS['_SESSION'], $this->fw->getSession());
 
         $this->assertSame('bar', $this->fw->flashSession('foo'));
+        $this->assertNull($this->fw->getSession('foo'));
+        $this->assertNull($this->fw->removeSession('bar')->getSession('bar'));
+        $this->assertSame(array('baz' => 'qux'), $this->fw->getSession());
+
+        $this->fw->removeSession();
+
         $this->assertEmpty($this->fw->getSession());
         $this->assertSame($_SESSION, $this->fw->getSession());
         $this->assertSame($GLOBALS['_SESSION'], $this->fw->getSession());
