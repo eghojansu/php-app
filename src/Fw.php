@@ -204,9 +204,19 @@ class Fw
 
     public function setEnv(string|null $env): static
     {
-        if ($env) {
-            $this->env = strtolower($env);
-        }
+        $this->env = $env ? strtolower($env) : null;
+
+        return $this;
+    }
+
+    public function getProjectDir(): string|null
+    {
+        return $this->data['project_dir'] ?? null;
+    }
+
+    public function setProjectDir(string $projectDir): static
+    {
+        $this->data['project_dir'] = rtrim(Str::fixslashes($projectDir), '/');
 
         return $this;
     }

@@ -68,6 +68,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('', $this->fw->getContentType());
         $this->assertSame('http://localhost', $this->fw->getBaseUrl());
         $this->assertSame('prod', $this->fw->getEnv());
+        $this->assertSame(null, $this->fw->getProjectDir());
 
         // mutate
         $this->assertSame('post', $this->fw->setVerb('post')->getVerb());
@@ -88,6 +89,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(true, $this->fw->setBuiltin(true)->isBuiltin());
         $this->assertSame('http://localhost/foo', $this->fw->setBaseUrl('http://localhost/foo')->getBaseUrl());
         $this->assertSame('dev', $this->fw->setEnv('dev')->getEnv());
+        $this->assertSame('dev', $this->fw->setProjectDir('dev//')->getProjectDir());
     }
 
     public function testResponse()
