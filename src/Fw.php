@@ -1139,7 +1139,10 @@ class Fw
 
     public function getRenderSetup(): array
     {
-        return $this->box['RENDER'] ?? array();
+        return $this->box['RENDER'] ?? array(
+            'directories' => array(),
+            'extensions' => array('.php'),
+        );
     }
 
     public function setRenderSetup(string|array $directories, string|array $extensions = null): static
@@ -1151,7 +1154,7 @@ class Fw
             ),
             'extensions' => array_map(
                 static fn(string $ext) => '.' . trim($ext, '.'),
-                Arr::ensure($extensions),
+                Arr::ensure($extensions ?? array('.php')),
             ),
         );
 
@@ -1165,11 +1168,11 @@ class Fw
             file_exists($found = $file)
             || (
                 $found = Arr::first(
-                    $setup['directories'] ?? array(),
+                    $setup['directories'],
                     fn (string $dir) => (
                         file_exists($found = $dir . $file)
                         || ($found = Arr::first(
-                            $setup['extensions'] ?? array('.php'),
+                            $setup['extensions'],
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
                                 || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
