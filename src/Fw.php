@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekok\App;
 
 use Ekok\Utils\Arr;
@@ -413,7 +415,7 @@ class Fw
 
     public function isContentType(string $mime): bool
     {
-        return preg_match('/^' . preg_quote($mime, '/') . '/i', $this->getContentType());
+        return !!preg_match('/^' . preg_quote($mime, '/') . '/i', $this->getContentType());
     }
 
     public function isMultipart(): bool
@@ -462,7 +464,7 @@ class Fw
 
     public function accept(string $mime): bool
     {
-        return preg_match('/\b' . preg_quote($mime, '/') . '\b/i', $this->headers('accept') ?? '*/*');
+        return !!preg_match('/\b' . preg_quote($mime, '/') . '\b/i', $this->headers('accept') ?? '*/*');
     }
 
     public function acceptBest(): string
@@ -1101,7 +1103,7 @@ class Fw
             $sleep = ++$ctr / $kbps > $elapsed;
 
             if ($sleep) {
-                usleep(round(1e6 * ($ctr / $kbps - $elapsed)));
+                usleep(intval(1e6 * ($ctr / $kbps - $elapsed)));
             }
         }
 
@@ -1132,7 +1134,7 @@ class Fw
             $sleep = ++$ctr / $kbps > $elapsed;
 
             if ($sleep) {
-                usleep(round(1e6 * ($ctr / $kbps - $elapsed)));
+                usleep(intval(1e6 * ($ctr / $kbps - $elapsed)));
             }
         }
     }
@@ -1283,7 +1285,7 @@ class Fw
     private function routeSet(string|null $str): array
     {
         return Arr::reduce(
-            array_filter(explode(',', $str), 'trim'),
+            $str ? array_filter(explode(',', $str), 'trim') : array(),
             static function (array $set, string $line) {
                 list($tag, $value) = array_map('trim', explode('=', $line . '='));
 

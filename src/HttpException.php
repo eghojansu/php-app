@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ekok\App;
 
 class HttpException extends \RuntimeException
@@ -21,7 +23,7 @@ class HttpException extends \RuntimeException
         int $code = 0,
         \Throwable $previous = null,
     ) {
-        parent::__construct($message, $code, $previous);
+        parent::__construct($message ?? '', $code, $previous);
 
         $this->statusCode = $statusCode;
         $this->payload = $payload;
