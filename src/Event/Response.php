@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Ekok\App\Event;
 
-use Ekok\App\Fw;
-
-class ResponseEvent extends RequestEvent
+class Response extends Request
 {
     private $result;
 
@@ -15,7 +13,6 @@ class ResponseEvent extends RequestEvent
         parent::__construct($output, $code, $headers);
 
         $this->result = $result;
-        $this->setName(Fw::EVENT_RESPONSE);
     }
 
     public function getResult()

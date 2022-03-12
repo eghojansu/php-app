@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Ekok\App\Event;
 
-use Ekok\App\Fw;
 use Ekok\EventDispatcher\Event;
+use Ekok\Utils\Http;
 
-class RequestEvent extends Event
+class Request extends Event
 {
     /** @var int */
     private $code;
 
     /** @var int */
     private $kbps;
+
+    /** @var string */
+    private $mime;
 
     /** @var mixed */
     private $output;
@@ -23,10 +26,9 @@ class RequestEvent extends Event
 
     public function __construct($output = null, int $code = null, array $headers = null)
     {
-        $this->code = $code ?? 200;
-        $this->output = $output;
-        $this->headers = $headers;
-        $this->setName(Fw::EVENT_REQUEST);
+        $this->setCode($code ?? 200);
+        $this->setOutput($output);
+        $this->setHeaders($headers);
     }
 
     public function getCode(): int
@@ -37,13 +39,14 @@ class RequestEvent extends Event
     public function setCode(int $code): static
     {
         $this->code = $code;
+        $this->text = Http::statusText($code);
 
         return $this;
     }
 
     public function getText(): string
     {
-        return Fw::statusText($this->code);
+        return $this->text;
     }
 
     public function getOutput()
@@ -75,9 +78,21 @@ class RequestEvent extends Event
         return $this->kbps;
     }
 
-    public function setKbps(int $kbps): static
+    public function setKbps(int|null $kbps): static
     {
         $this->kbps = $kbps;
+
+        return $this;
+    }
+
+    public function getMime(): string|null
+    {
+        return $this->mime;
+    }
+
+    public function setMime(string|null $mime): static
+    {
+        $this->mime = $mime;
 
         return $this;
     }

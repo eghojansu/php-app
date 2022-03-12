@@ -11,10 +11,15 @@ use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
 use Ekok\Container\Box;
-use Ekok\App\Event\ErrorEvent;
-use Ekok\App\Event\RequestEvent;
-use Ekok\App\Event\ResponseEvent;
+use Ekok\App\Event\Controller as ControllerEvent;
+use Ekok\App\Event\ControllerArguments as ControllerArgumentsEvent;
+use Ekok\App\Event\Error as ErrorEvent;
+use Ekok\App\Event\Redirect as RedirectEvent;
+use Ekok\App\Event\Request as RequestEvent;
+use Ekok\App\Event\Response as ResponseEvent;
 use Ekok\EventDispatcher\Dispatcher;
+use Ekok\EventDispatcher\Event;
+use Ekok\Utils\Http;
 
 class Fw
 {
@@ -22,65 +27,6 @@ class Fw
     const ROUTE_VERBS = 'GET|POST|PUT|DELETE|HEAD|OPTIONS';
     const ROUTE_PARAMS = '/(?:\/?@(\w+)(?:(?::([^\/?]+)|(\*)))?(\?)?)/';
     const ROUTE_PATTERN = '/^\s*([\w|]+)(?:\s*@([^\s]+))?(?:\s*(\/[^\s]*))?(?:\s*\[([\w|,=]+)\])?\s*$/';
-
-    const EVENT_REQUEST = 'fw.request';
-    const EVENT_RESPONSE = 'fw.response';
-    const EVENT_ERROR = 'fw.error';
-
-    const HTTP_100 = 'Continue';
-    const HTTP_101 = 'Switching Protocols';
-    const HTTP_103 = 'Early Hints';
-    const HTTP_200 = 'OK';
-    const HTTP_201 = 'Created';
-    const HTTP_202 = 'Accepted';
-    const HTTP_203 = 'Non-Authoritative Information';
-    const HTTP_204 = 'No Content';
-    const HTTP_205 = 'Reset Content';
-    const HTTP_206 = 'Partial Content';
-    const HTTP_300 = 'Multiple Choices';
-    const HTTP_301 = 'Moved Permanently';
-    const HTTP_302 = 'Found';
-    const HTTP_303 = 'See Other';
-    const HTTP_304 = 'Not Modified';
-    const HTTP_307 = 'Temporary Redirect';
-    const HTTP_308 = 'Permanent Redirect';
-    const HTTP_400 = 'Bad Request';
-    const HTTP_401 = 'Unauthorized';
-    const HTTP_402 = 'Payment Required';
-    const HTTP_403 = 'Forbidden';
-    const HTTP_404 = 'Not Found';
-    const HTTP_405 = 'Method Not Allowed';
-    const HTTP_406 = 'Not Acceptable';
-    const HTTP_407 = 'Proxy Authentication Required';
-    const HTTP_408 = 'Request Timeout';
-    const HTTP_409 = 'Conflict';
-    const HTTP_410 = 'Gone';
-    const HTTP_411 = 'Length Required';
-    const HTTP_412 = 'Precondition Failed';
-    const HTTP_413 = 'Payload Too Large';
-    const HTTP_414 = 'URI Too Long';
-    const HTTP_415 = 'Unsupported Media Type';
-    const HTTP_416 = 'Range Not Satisfiable';
-    const HTTP_417 = 'Expectation Failed';
-    const HTTP_418 = 'I\'m a teapot';
-    const HTTP_422 = 'Unprocessable Entity';
-    const HTTP_425 = 'Too Early';
-    const HTTP_426 = 'Upgrade Required';
-    const HTTP_428 = 'Precondition Required';
-    const HTTP_429 = 'Too Many Requests';
-    const HTTP_431 = 'Request Header Fields Too Large';
-    const HTTP_451 = 'Unavailable For Legal Reasons';
-    const HTTP_500 = 'Internal Server Error';
-    const HTTP_501 = 'Not Implemented';
-    const HTTP_502 = 'Bad Gateway';
-    const HTTP_503 = 'Service Unavailable';
-    const HTTP_504 = 'Gateway Timeout';
-    const HTTP_505 = 'HTTP Version Not Supported';
-    const HTTP_506 = 'Variant Also Negotiates';
-    const HTTP_507 = 'Insufficient Storage';
-    const HTTP_508 = 'Loop Detected';
-    const HTTP_510 = 'Not Extended';
-    const HTTP_511 = 'Network Authentication Required';
 
     private $routes = array();
     private $aliases = array();
@@ -111,28 +57,6 @@ class Fw
         );
     }
 
-    public static function statusText(int $code, bool &$exists = null): string
-    {
-        $exists = defined($httpCode = 'self::HTTP_' . $code);
-        $text = $exists ? constant($httpCode) : sprintf('Unsupported HTTP code: %s', $code);
-
-        return $text;
-    }
-
-    public static function gmDate(\DateTime|string|int $time = null, int &$diff = null, string $format = null): string
-    {
-        $tz = new \DateTimeZone('GMT');
-        $ts = match(true) {
-            $time instanceof \DateTime => (clone $time)->setTimezone($tz)->getTimestamp(),
-            is_string($time) => (new \DateTime($time, $tz))->getTimestamp(),
-            $time < 0 => time() + $time,
-            default => $time ?? time(),
-        };
-        $diff = $ts - time();
-
-        return gmdate($format ?? \DateTimeInterface::RFC7231, $ts);
-    }
-
     public function getContainer(): Di
     {
         return $this->di;
@@ -140,22 +64,50 @@ class Fw
 
     public function getBox(): Box
     {
-        return $this->di->make('box');
+        return $this->di->make(Box::class);
     }
 
     public function getLog(): Log
     {
-        return $this->di->make('log');
+        return $this->di->make(Log::class);
     }
 
     public function getCache(): Cache
     {
-        return $this->di->make('cache');
+        return $this->di->make(Cache::class);
     }
 
     public function getDispatcher(): Dispatcher
     {
-        return $this->di->make('dispatcher');
+        return $this->di->make(Dispatcher::class);
+    }
+
+    public function listen(string $eventName, callable|string $handler, int $priority = null, bool $once = false): static
+    {
+        $this->getDispatcher()->on($eventName, $handler, $priority, $once);
+
+        return $this;
+    }
+
+    public function unlisten(string $eventName, int $pos = null): static
+    {
+        $this->getDispatcher()->off($eventName, $pos);
+
+        return $this;
+    }
+
+    public function dispatch(Event $event, string $eventName = null, bool $once = false): static
+    {
+        $this->getDispatcher()->dispatch($event, $eventName, $once);
+
+        return $this;
+    }
+
+    public function log(string $level, string $message, array $context = null): static
+    {
+        $this->getLog()->log($level, $message, $context);
+
+        return $this;
     }
 
     public function chain(callable|string $cb): static
@@ -223,6 +175,66 @@ class Fw
         return $this;
     }
 
+    public function getSeed(): string
+    {
+        return $this->data['seed'] ?? ($this->data['seed'] = Str::hash($this->getProjectDir() ?? static::class));
+    }
+
+    public function setSeed(string|null $seed): static
+    {
+        $this->data['seed'] = $seed;
+
+        return $this;
+    }
+
+    public function getNavigationMode(): string
+    {
+        return $this->data['navigation_mode'] ?? 'header';
+    }
+
+    public function setNavigationMode(string $mode): static
+    {
+        $this->data['navigation_mode'] = strtolower($mode);
+
+        return $this;
+    }
+
+    public function getNavigationKey(): string
+    {
+        return $this->data['navigation_key'] ?? 'referer';
+    }
+
+    public function setNavigationKey(string $key): static
+    {
+        $this->data['navigation_key'] = $key;
+
+        return $this;
+    }
+
+    public function getPreviousUrl(): string|null
+    {
+        return $this->data['previous_url'] ?? ($this->data['previous_url'] = $this->getResolvedPreviousUrl());
+    }
+
+    public function setPreviousUrl(string $url): static
+    {
+        $this->data['previous_url'] = $url;
+
+        return $this;
+    }
+
+    public function getBackUrl(): string|null
+    {
+        return $this->data['back_url'] ?? $this->uri();
+    }
+
+    public function setBackUrl(string $url): static
+    {
+        $this->data['back_url'] = $url;
+
+        return $this;
+    }
+
     public function isDebug(): bool
     {
         return $this->data['debug'] ?? ($this->data['debug'] = in_array($this->getEnv(), array('dev', 'development')));
@@ -286,25 +298,28 @@ class Fw
         $event = new ErrorEvent($code_, $message_, $headers_, $payload_, $error_);
 
         try {
-            $this->getDispatcher()->dispatch($event, null, true);
+            $this->dispatch($event, null, true);
         } catch (\Throwable $error) {
             $event = new ErrorEvent(500, $error->getMessage() ?: null, error: $error);
         }
 
         if (null === $event->getMessage()) {
-            $event->setMessage(sprintf('[%s - %s] %s %s', $event->getCode(), $event->getText(), $this->getVerb(), $this->getPath()));
+            $event->setMessage(sprintf(
+                '[%s - %s] %s %s',
+                $event->getCode(),
+                $event->getText(),
+                $this->getVerb(),
+                $this->getPath(),
+            ));
         }
 
-        $this->getLog()->log(
+        $this->log(
             Log::LEVEL_INFO,
             $event->getMessage(),
-            Arr::formatTrace(
-                $event->getPayload() ?? $event->getError() ?? array()
-            ),
+            Arr::formatTrace($event->getPayload() ?? $event->getError() ?? array()),
         );
 
-        $this->status($event->getCode(), false);
-        $this->send($event->getOutput() ?? $this->errorBuild($event), $event->getHeaders(), $event->getMime());
+        $this->doResponse($event, null, fn () => $this->errorBuild($event));
 
         return $this;
     }
@@ -371,11 +386,42 @@ class Fw
         return $this->aliases;
     }
 
+    public function redirect(string $url, bool $permanent = null, int $code = null): static
+    {
+        $this->dispatch($event = new RedirectEvent($code ?? ($permanent ? 301 : 302), $url, $permanent));
+
+        if (!$event->isPropagationStopped()) {
+            $this->addHeader('Location', $event->getUrl());
+        }
+
+        $this->doResponse($event);
+
+        return $this;
+    }
+
+    public function redirectTo(
+        string $path,
+        array $args = null,
+        bool $absolute = false,
+        bool $entry = true,
+        bool $permanent = null,
+        int $code = null,
+    ): static {
+        return $this->redirect(
+            $this->url($path, $args, $absolute, $entry),
+            $permanent,
+            $code,
+        );
+    }
+
+    public function redirectBack(string $fallbackUrl = null): static
+    {
+        return $this->redirect($this->getPreviousUrl() ?? $fallbackUrl ?? $this->url('/'), null, 303);
+    }
+
     public function routeAll(array $routes): static
     {
-        array_walk($routes, function ($handler, $route) {
-            $this->route($route, $handler);
-        });
+        array_walk($routes, fn ($handler, $route) => $this->route($route, $handler));
 
         return $this;
     }
@@ -407,6 +453,18 @@ class Fw
         }
 
         return $this;
+    }
+
+    public function rerouteAll(array $routes): static
+    {
+        array_walk($routes, fn ($args, $route) => $this->reroute($route, ...((array) $args)));
+
+        return $this;
+    }
+
+    public function reroute(string $route, string $url, bool $permanent = true): static
+    {
+        return $this->route($route, fn () => $this->redirect($url, $permanent));
     }
 
     public function routeMatch(string $path = null, string $method = null): array|null
@@ -472,29 +530,39 @@ class Fw
         return $this;
     }
 
-    public function getPost(): array
+    public function getPost(string $name = null)
     {
-        return $this->data['POST'];
+        return $name ? ($this->data['POST'][$name] ?? null) : $this->data['POST'];
     }
 
-    public function getQueries(): array
+    public function getPostInt(string $name, int $default = null): int
     {
-        return $this->data['GET'];
+        return is_numeric($val = $this->getPost($name)) ? intval($val) : $default ?? 0;
     }
 
-    public function getFiles(): array
+    public function getQuery(string $name = null)
     {
-        return $this->data['FILES'];
+        return $name ? ($this->data['GET'][$name] ?? null) : $this->data['GET'];
     }
 
-    public function getServer(): array
+    public function getQueryInt(string $name, int $default = null): int
     {
-        return $this->data['SERVER'];
+        return is_numeric($val = $this->getQuery($name)) ? intval($val) : $default ?? 0;
     }
 
-    public function getServerEnv(): array
+    public function getFiles(string $name = null)
     {
-        return $this->data['ENV'];
+        return $name ? ($this->data['FILES'][$name] ?? null) : $this->data['FILES'];
+    }
+
+    public function getServer(string $name = null)
+    {
+        return $name ? ($this->data['SERVER'][$name] ?? null) : $this->data['SERVER'];
+    }
+
+    public function getServerEnv(string $name = null)
+    {
+        return $name ? ($this->data['ENV'][$name] ?? null) : $this->data['ENV'];
     }
 
     public function wantsJson(): bool
@@ -509,7 +577,7 @@ class Fw
 
     public function acceptBest(): string
     {
-        return Arr::fromHttpAccept($this->headers('accept') ?? '')[0] ?? '*/*';
+        return Http::parseHeader($this->headers('accept') ?? '')[0] ?? '*/*';
     }
 
     public function headers(string $key = null): array|string|null
@@ -517,9 +585,11 @@ class Fw
         $srv = $this->data['SERVER'] ?? array();
 
         if ($key) {
-            $key_ = strtoupper(str_replace('-', '_', $key));
-
-            return $srv[$key_] ?? $srv['HTTP_' . $key_] ?? null;
+            return (
+                $srv[$key] ??
+                $srv[$upper = strtoupper(str_replace('-', '_', $key))] ??
+                $srv['HTTP_' . $upper] ?? null
+            );
         }
 
         return Arr::reduce(
@@ -646,6 +716,14 @@ class Fw
         $this->data['entry'] = $entry;
 
         return $this;
+    }
+
+    public function isVerb(string ...$verbs): bool
+    {
+        return $verbs && (
+            ($verb = $this->getVerb()) === $verbs[0]
+            || preg_grep('/^' . preg_quote($verb, '/') . '$/i', $verbs)
+        );
     }
 
     public function getVerb(): string
@@ -850,7 +928,7 @@ class Fw
         }
 
         if ($set = $exp ?? $expires ?? $jar['expires']) {
-            $cookie .= '; Expires=' . static::gmDate($set, $max) . '; Max-Age=' . $max;
+            $cookie .= '; Expires=' . Http::stamp($set, null, $max) . '; Max-Age=' . $max;
         }
 
         if ($set = $domain ?? $jar['domain']) {
@@ -1025,15 +1103,9 @@ class Fw
         return $this->data['text'] ?? null;
     }
 
-    public function status(int $code, bool $throw = true): static
+    public function status(int $code): static
     {
-        $text = static::statusText($code, $exists);
-
-        if (!$exists && $throw) {
-            throw new \LogicException($text);
-        }
-
-        $this->data['text'] = $text;
+        $this->data['text'] = Http::statusText($code);
         $this->data['code'] = $code;
 
         return $this;
@@ -1069,6 +1141,10 @@ class Fw
             $this->addHeader('Content-Length', strlen($output));
         }
 
+        if ($this->isVerb('GET', 'HEAD') && $backUrl = $this->getBackUrl()) {
+            $this->setBackUrlForNextRequest($backUrl);
+        }
+
         foreach ($this->data['headers'] ?? array() as $name => $headers) {
             $set = ucwords($name, '-') . ': ';
             $replace = empty($headers[1]);
@@ -1102,7 +1178,7 @@ class Fw
         $lastModified = filemtime($file);
         $modifiedSince = $this->headers('if_modified_since');
 
-        $this->addHeader('Last-Modified', static::gmDate($lastModified));
+        $this->addHeader('Last-Modified', Http::stamp($lastModified));
 
         if ($range) {
             $this->addHeader('Accept-Ranges', 'bytes');
@@ -1322,6 +1398,26 @@ class Fw
         return strtr($template, Arr::quoteKeys($replace, '{}'));
     }
 
+    private function getResolvedPreviousUrl(): string
+    {
+        return match ($this->getNavigationMode()) {
+            'header' => $this->headers($this->getNavigationKey()),
+            'cookie' => $this->getCookie($this->getNavigationKey()),
+            'session' => $this->getSession($this->getNavigationKey()),
+            'query' => urldecode($this->getQuery($this->getNavigationKey()) ?? ''),
+            default => null,
+        } ?? '';
+    }
+
+    private function setBackUrlForNextRequest(string $url): void
+    {
+        match ($this->getNavigationMode()) {
+            'cookie' => $this->setCookie($this->getNavigationKey(), $url),
+            'session' => $this->setSession($this->getNavigationKey(), $url),
+            default => 'none set',
+        };
+    }
+
     private function routeFind(string $path, array &$args = null): array|null
     {
         return Arr::first(
@@ -1383,10 +1479,10 @@ class Fw
 
     private function runInternal(): void
     {
-        $this->getDispatcher()->dispatch($event = new RequestEvent());
+        $this->dispatch($event = new RequestEvent());
 
         if ($event->isPropagationStopped()) {
-            $this->runResult(null, $event->getOutput(), $event->getKbps());
+            $this->doResponse($event);
 
             return;
         }
@@ -1403,9 +1499,17 @@ class Fw
 
         $this->data['match'] = $match;
 
-        list($result, $output) = $this->runHandle($match['handler'], $match['args']);
+        $this->dispatch($event = new ControllerEvent($match['handler']));
 
-        $this->runResult($result, $output, intval($match['kbps'] ?? 0));
+        $handler = $event->getController();
+
+        $this->dispatch($event = new ControllerArgumentsEvent($handler, $match['args']));
+
+        $arguments = $event->getArguments();
+
+        list($result, $output) = $this->runHandle($handler, $arguments);
+
+        $this->doResponse($result, $output, null, $match['kbps'] ?? 0);
     }
 
     private function runHandle(string|callable $handler, array|null $args): array
@@ -1422,16 +1526,36 @@ class Fw
         return array($result, $output[0] ?? null);
     }
 
-    private function runResult($result, string $output, int $speed = null): void
+    private function doResponse($result, string $output = null, \Closure $getOutput = null, string|int $kbps = null): void
     {
-        $this->getDispatcher()->dispatch($event = new ResponseEvent($result, $output));
+        if ($result instanceof RequestEvent) {
+            $event = new ResponseEvent(null);
+            $event->setOutput($result->getOutput() ?? $output);
+            $event->setHeaders($result->getHeaders());
+            $event->setCode($result->getCode());
+            $event->setKbps($result->getKbps());
+            $event->setMime($result->getMime());
+            $event->setKbps($result->getKbps() ?? intval($kbps ?? 0));
+        } else {
+            $event = new ResponseEvent($result, $output);
+            $event->setKbps(intval($kbps ?? 0));
+        }
+
+        $this->dispatch($event);
 
         if (is_callable($response = $event->getResult())) {
             $this->di->call($response);
-        } elseif (!$response) {
-            $this->send($event->getOutput(), kbps: $event->getKbps() ?? $speed);
-        } elseif (is_scalar($response) || is_array($response) || $response instanceof \Stringable) {
-            $this->send($response, kbps: $event->getKbps() ?? $speed);
+        } elseif (
+            !$response ||
+            ($raw = is_scalar($response) || is_array($response) || $response instanceof \Stringable)
+        ) {
+            $this->send(
+                ($raw ?? false) ? $response : $event->getOutput() ?? ($getOutput ? $getOutput() : null),
+                $event->getHeaders(),
+                $event->getCode(),
+                $event->getMime(),
+                $event->getKbps(),
+            );
         }
     }
 

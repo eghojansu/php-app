@@ -5,9 +5,11 @@ use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
 use Ekok\Container\Box;
-use Ekok\App\Event\ErrorEvent;
-use Ekok\App\Event\RequestEvent;
+use Ekok\App\Event\Error as ErrorEvent;
+use Ekok\App\Event\Redirect as RedirectEvent;
+use Ekok\App\Event\Request as RequestEvent;
 use Ekok\EventDispatcher\Dispatcher;
+use Ekok\EventDispatcher\Event;
 
 class FwTest extends \Codeception\Test\Unit
 {
@@ -41,11 +43,13 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->assertArrayHasKey('SERVER', $this->fw->getData());
         $this->assertSame(array(), $this->fw->getPost());
-        $this->assertSame(array(), $this->fw->getQueries());
+        $this->assertSame(array(), $this->fw->getQuery());
         $this->assertSame(array(), $this->fw->getFiles());
         $this->assertSame($_SERVER, $this->fw->getServer());
         $this->assertSame($_ENV, $this->fw->getServerEnv());
         $this->assertSame('GET', $this->fw->getVerb());
+        $this->assertSame(true, $this->fw->isVerb('GET'));
+        $this->assertSame(false, $this->fw->isVerb('POST'));
         $this->assertSame('/', $this->fw->getPath());
         $this->assertSame('', $this->fw->getBasePath());
         $this->assertSame('', $this->fw->getEntry());
@@ -69,6 +73,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('http://localhost', $this->fw->getBaseUrl());
         $this->assertSame('prod', $this->fw->getEnv());
         $this->assertSame(null, $this->fw->getProjectDir());
+        $this->assertSame('2pk661ijd5ogk', $this->fw->getSeed());
 
         // mutate
         $this->assertSame('post', $this->fw->setVerb('post')->getVerb());
@@ -90,6 +95,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('http://localhost/foo', $this->fw->setBaseUrl('http://localhost/foo')->getBaseUrl());
         $this->assertSame('dev', $this->fw->setEnv('dev')->getEnv());
         $this->assertSame('dev', $this->fw->setProjectDir('dev//')->getProjectDir());
+        $this->assertSame('dev', $this->fw->setSeed('dev')->getSeed());
     }
 
     public function testResponse()
@@ -122,12 +128,6 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame($expected['location'], $this->fw->getHeader('location'));
         $this->assertSame($expected['location'], $this->fw->getHeader('Location'));
         $this->assertSame(array(), $this->fw->getHeader('unknown'));
-
-        // status exception
-        $this->expectException('LogicException');
-        $this->expectExceptionMessage('Unsupported HTTP code: 999');
-
-        $this->fw->status(999);
     }
 
     public function testSendResponse()
@@ -433,10 +433,8 @@ class FwTest extends \Codeception\Test\Unit
 
     public function testRunInteruption()
     {
-        $this->fw->chain(static function (Dispatcher $dispatcher) {
-            $dispatcher->on(Fw::EVENT_REQUEST, static function (RequestEvent $event) {
-                $event->setOutput('foo')->setKbps(0)->stopPropagation();
-            });
+        $this->fw->listen(RequestEvent::class, static function (RequestEvent $event) {
+            $event->setOutput('foo')->setKbps(0)->stopPropagation();
         });
         $this->fw->run();
 
@@ -481,14 +479,13 @@ class FwTest extends \Codeception\Test\Unit
     {
         $called = false;
         $this->fw->setErrorTemplate('cli', '[CLI] [{code} - {text}] {message}');
-        $this->fw->chain(static function (Dispatcher $dispatcher) use (&$called) {
-            $dispatcher->on(Fw::EVENT_ERROR, static function (ErrorEvent $event) use (&$called) {
-                $called = $event->setPayload(null)->setMessage('Update ' . $event->getMessage())->getError() instanceof \LogicException;
-                $event->setMime('set');
+        $this->fw->listen(ErrorEvent::class, static function (ErrorEvent $event) use (&$called) {
+            $called = $event->setPayload(null)->setMessage('Update ' . $event->getMessage())->getError() instanceof \LogicException;
+            $event->setMime('set');
 
-                throw new \RuntimeException($event->getMessage() . ' and Error after error');
-            });
-        })->error(new \LogicException('First error'));
+            throw new \RuntimeException($event->getMessage() . ' and Error after error');
+        });
+        $this->fw->error(new \LogicException('First error'));
 
         $this->assertTrue($called);
         $this->assertSame('[CLI] [500 - Internal Server Error] Update First error and Error after error', $this->fw->getOutput());
@@ -621,31 +618,6 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(array('foo' => 'bar'), $this->fw->setBody('{"foo":"bar"}')->getJson());
     }
 
-    public function testGmDate()
-    {
-        $tz = new \DateTimeZone('GMT');
-        $fmt = \DateTimeInterface::RFC7231;
-        $now = new \DateTime('now', $tz);
-        $yes = new \DateTime('yesterday', $tz);
-        $tom = new \DateTime('tomorrow', $tz);
-        $t1 = new \DateTime('+2 hours', $tz);
-        $t2 = new \DateTime('-2 hours', $tz);
-
-        $this->assertSame($now->format($fmt), Fw::gmDate($now));
-        $this->assertSame($yes->format($fmt), Fw::gmDate($yes));
-        $this->assertSame($tom->format($fmt), Fw::gmDate($tom));
-        $this->assertSame($tom->format($fmt), Fw::gmDate('tomorrow'));
-
-        $this->assertSame($t1->format($fmt), Fw::gmDate($t1->getTimestamp(), $diff));
-        $this->assertSame(7200, $diff);
-
-        $this->assertSame($t2->format($fmt), Fw::gmDate($t2->getTimestamp(), $diff));
-        $this->assertSame(-7200, $diff);
-
-        $this->assertSame($t2->format($fmt), Fw::gmDate(-7200, $diff));
-        $this->assertSame(-7200, $diff);
-    }
-
     public function testRemoveCookie()
     {
         $this->assertEmpty($this->fw->getCookie());
@@ -774,5 +746,221 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame($fw, $di->make(Fw::class));
         $this->assertSame($di->make(FwExt::class), $di->make(Fw::class));
+    }
+
+    public function testDataGetter()
+    {
+        $fw = Fw::create(null, array(
+            'foo' => 'bar',
+            'GET' => array('int' => '100'),
+            'POST' => array('int' => '100'),
+            'FILES' => array('foo' => 'bar'),
+            'ENV' => array('foo' => 'bar'),
+        ));
+
+        $this->assertSame('bar', $fw->getData('foo'));
+        $this->assertSame('bar', $fw->getFiles('foo'));
+        $this->assertSame(null, $fw->getServer('REQUEST_METHOD'));
+        $this->assertSame('bar', $fw->getServerEnv('foo'));
+        $this->assertSame('100', $fw->getQuery('int'));
+        $this->assertSame(100, $fw->getQueryInt('int'));
+        $this->assertSame('100', $fw->getPost('int'));
+        $this->assertSame(100, $fw->getPostInt('int'));
+    }
+
+    /** @dataProvider backUrlProvider */
+    public function testSetBackUrl(string|null $prevUrl, string|null $backUrl, array $env = null)
+    {
+        $fw = Fw::create(null, array('quiet' => true) + ($env ?? array()));
+
+        if (isset($env['mode'])) {
+            $fw->setNavigationMode($env['mode']);
+        }
+
+        if (isset($env['key'])) {
+            $fw->setNavigationKey($env['key']);
+        }
+
+        if (isset($env['burl'])) {
+            $fw->setBackUrl($env['burl']);
+        }
+
+        if (isset($env['purl'])) {
+            $fw->setPreviousUrl($env['purl']);
+        }
+
+        $this->assertSame($prevUrl, $fw->getPreviousUrl());
+
+        $fw->send();
+
+        $this->assertSame($backUrl, $fw->getBackUrl());
+    }
+
+    public function backUrlProvider()
+    {
+        return array(
+            'from header (default)' => array(
+                'foo',
+                'http://localhost/',
+                array(
+                    'SERVER' => array(
+                        'HTTP_REFERER' => 'foo',
+                    ),
+                ),
+            ),
+            'from cookie' => array(
+                'foo',
+                'http://localhost/',
+                array(
+                    'mode' => 'cookie',
+                    'COOKIE' => array('referer' => 'foo'),
+                ),
+            ),
+            'from session' => array(
+                '',
+                'http://localhost/',
+                array(
+                    'mode' => 'session',
+                ),
+            ),
+            'from query' => array(
+                'foo',
+                'http://localhost/?referer=foo',
+                array(
+                    'mode' => 'query',
+                    'GET' => array(
+                        'referer' => 'foo',
+                    ),
+                ),
+            ),
+            'from none' => array(
+                '',
+                'http://localhost/',
+                array(
+                    'mode' => 'none',
+                ),
+            ),
+            'custom set' => array(
+                'prev',
+                'back',
+                array(
+                    'mode' => 'cookie',
+                    'key' => 'custom',
+                    'burl' => 'back',
+                    'purl' => 'prev',
+                ),
+            ),
+        );
+    }
+
+    public function testEventDispatcher()
+    {
+        $this->fw->listen('foo', static function (Event $event) {
+            $event->stopPropagation();
+        });
+
+        $this->fw->dispatch($event = Event::named('foo'));
+        $this->assertTrue($event->isPropagationStopped());
+
+        // remove
+        $this->fw->unlisten('foo');
+
+        $this->fw->dispatch($event = Event::named('foo'));
+        $this->assertFalse($event->isPropagationStopped());
+    }
+
+    public function testChain()
+    {
+        $called = false;
+        $fw = $this->fw->chain(static function () use (&$called) {
+            $called = true;
+        });
+
+        $this->assertTrue($called);
+        $this->assertSame($fw, $this->fw);
+    }
+
+    /** @dataProvider reroutingProvider */
+    public function testRerouting(string $expected, array $env = null)
+    {
+        $fw = Fw::create(null, array('quiet' => true) + ($env ?? array()));
+        $fw->rerouteAll(array(
+            'GET /' => 'home',
+            'GET /temporary' => array('base', false),
+        ));
+        $fw->listen(RedirectEvent::class, static function (RedirectEvent $event, Fw $fw) {
+            $event->setOutput(sprintf(
+                '[%s - %s] %s %s redirected to %s%s',
+                $event->getCode(),
+                $event->getText(),
+                $fw->getVerb(),
+                $fw->getPath(),
+                $event->getUrl(),
+                $event->isPermanent() ? ' [permanent]' : '',
+            ));
+        });
+        $fw->run();
+
+        $this->assertSame($expected, $fw->getOutput());
+    }
+
+    public function reroutingProvider()
+    {
+        return array(
+            'std' => array(
+                '[301 - Moved Permanently] GET / redirected to home [permanent]',
+            ),
+            'not permanent' => array(
+                '[302 - Found] GET /temporary redirected to base',
+                array(
+                    'SERVER' => array(
+                        'REQUEST_URI' => '/temporary',
+                    ),
+                ),
+            ),
+        );
+    }
+
+    public function testRedirectTo()
+    {
+        $this->fw->listen(RedirectEvent::class, static function (RedirectEvent $event, Fw $fw) {
+            $event->setOutput(sprintf(
+                '[%s - %s] %s %s redirected to %s%s',
+                $event->getCode(),
+                $event->getText(),
+                $fw->getVerb(),
+                $fw->getPath(),
+                $event->getUrl(),
+                $event->isPermanent() ? ' [permanent]' : '',
+            ));
+        });
+        $this->fw->redirectTo('home');
+
+        $expected = '[302 - Found] GET / redirected to /home';
+        $actual = $this->fw->getOutput();
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function testRedirectBack()
+    {
+        $this->fw->listen(RedirectEvent::class, static function (RedirectEvent $event, Fw $fw) {
+            $event->setOutput(sprintf(
+                '[%s - %s] %s %s redirected to %s%s',
+                $event->getCode(),
+                $event->getText(),
+                $fw->getVerb(),
+                $fw->getPath(),
+                $event->getUrl(),
+                $event->isPermanent() ? ' [permanent]' : '',
+            ));
+        });
+        $this->fw->setPreviousUrl('foo');
+        $this->fw->redirectBack();
+
+        $expected = '[303 - See Other] GET / redirected to foo';
+        $actual = $this->fw->getOutput();
+
+        $this->assertSame($expected, $actual);
     }
 }

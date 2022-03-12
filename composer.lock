@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-cache.git",
-                "reference": "3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d"
+                "reference": "f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d",
-                "reference": "3c8de0f08bface91dc0f2ec1b7005ed927a7ad4d",
+                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1",
+                "reference": "f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1",
                 "shasum": ""
             },
             "require": {
@@ -50,7 +50,7 @@
                 "issues": "https://github.com/eghojansu/php-cache/issues",
                 "source": "https://github.com/eghojansu/php-cache/tree/master"
             },
-            "time": "2022-03-10T03:26:21+00:00"
+            "time": "2022-03-11T14:56:13+00:00"
         },
         {
             "name": "ekok/php-container",
@@ -58,12 +58,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-container.git",
-                "reference": "53adc4a1112198e49271114368338201634d2054"
+                "reference": "4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/53adc4a1112198e49271114368338201634d2054",
-                "reference": "53adc4a1112198e49271114368338201634d2054",
+                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7",
+                "reference": "4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7",
                 "shasum": ""
             },
             "require": {
@@ -97,7 +97,7 @@
                 "issues": "https://github.com/eghojansu/php-container/issues",
                 "source": "https://github.com/eghojansu/php-container/tree/master"
             },
-            "time": "2022-03-11T01:55:00+00:00"
+            "time": "2022-03-11T15:49:26+00:00"
         },
         {
             "name": "ekok/php-event-dispatcher",
@@ -105,12 +105,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-event-dispatcher.git",
-                "reference": "5e7540300347d50311da431b08f11c5f9c15bcf0"
+                "reference": "9017c576bbebcf48f4aff66187ca4799f6d982af"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-event-dispatcher/zipball/5e7540300347d50311da431b08f11c5f9c15bcf0",
-                "reference": "5e7540300347d50311da431b08f11c5f9c15bcf0",
+                "url": "https://api.github.com/repos/eghojansu/php-event-dispatcher/zipball/9017c576bbebcf48f4aff66187ca4799f6d982af",
+                "reference": "9017c576bbebcf48f4aff66187ca4799f6d982af",
                 "shasum": ""
             },
             "require": {
@@ -145,7 +145,7 @@
                 "issues": "https://github.com/eghojansu/php-event-dispatcher/issues",
                 "source": "https://github.com/eghojansu/php-event-dispatcher/tree/master"
             },
-            "time": "2022-03-09T09:38:09+00:00"
+            "time": "2022-03-12T17:03:56+00:00"
         },
         {
             "name": "ekok/php-logger",
@@ -153,12 +153,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-logger.git",
-                "reference": "c09c3c222f4606dfc987e4797f637c98160f5729"
+                "reference": "98eb342e390f1de11073019d83eac38dd5706ff9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/c09c3c222f4606dfc987e4797f637c98160f5729",
-                "reference": "c09c3c222f4606dfc987e4797f637c98160f5729",
+                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/98eb342e390f1de11073019d83eac38dd5706ff9",
+                "reference": "98eb342e390f1de11073019d83eac38dd5706ff9",
                 "shasum": ""
             },
             "require": {
@@ -191,7 +191,7 @@
                 "issues": "https://github.com/eghojansu/php-logger/issues",
                 "source": "https://github.com/eghojansu/php-logger/tree/master"
             },
-            "time": "2022-03-10T03:29:29+00:00"
+            "time": "2022-03-11T15:04:37+00:00"
         },
         {
             "name": "ekok/php-utils",
@@ -199,12 +199,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "2f0fd542faf0f8c1fca982f404a982ae8c813e0a"
+                "reference": "4edc4d2914b0b65d891a1f690be95eb71bff534c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/2f0fd542faf0f8c1fca982f404a982ae8c813e0a",
-                "reference": "2f0fd542faf0f8c1fca982f404a982ae8c813e0a",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/4edc4d2914b0b65d891a1f690be95eb71bff534c",
+                "reference": "4edc4d2914b0b65d891a1f690be95eb71bff534c",
                 "shasum": ""
             },
             "require": {
@@ -237,7 +237,7 @@
                 "issues": "https://github.com/eghojansu/php-utils/issues",
                 "source": "https://github.com/eghojansu/php-utils/tree/master"
             },
-            "time": "2022-03-10T09:31:25+00:00"
+            "time": "2022-03-12T16:26:52+00:00"
         }
     ],
     "packages-dev": [
@@ -4722,5 +4722,5 @@
         "php": ">=8.0"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.1.0"
+    "plugin-api-version": "2.0.0"
 }
