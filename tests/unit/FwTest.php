@@ -963,4 +963,12 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame($expected, $actual);
     }
+
+    public function testEventByName()
+    {
+        $this->fw->listen('onRequest', static fn(RequestEvent $event) => $event->stopPropagation()->setOutput('foo'));
+        $this->fw->run();
+
+        $this->assertSame('foo', $this->fw->getOutput());
+    }
 }

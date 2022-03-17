@@ -2,8 +2,6 @@
 
 namespace Ekok\App\Event;
 
-use Ekok\EventDispatcher\Event;
-
 class Controller extends Event
 {
     private $controller;
