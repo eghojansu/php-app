@@ -1598,5 +1598,6 @@ HTML;
 {trace}
 
 TEXT;
+        set_exception_handler(fn(\Throwable $error) => $this->error($error));
     }
 }
