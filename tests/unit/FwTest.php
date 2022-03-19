@@ -4,7 +4,6 @@ use Ekok\App\Fw;
 use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
-use Ekok\Container\Box;
 use Ekok\App\Event\Error as ErrorEvent;
 use Ekok\App\Event\Redirect as RedirectEvent;
 use Ekok\App\Event\Request as RequestEvent;
@@ -31,8 +30,6 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame($this->fw->getCache(), $this->fw->getContainer()->make('cache'));
         $this->assertSame($this->fw->getLog(), $this->fw->getContainer()->make(Log::class));
         $this->assertSame($this->fw->getLog(), $this->fw->getContainer()->make('log'));
-        $this->assertSame($this->fw->getBox(), $this->fw->getContainer()->make(Box::class));
-        $this->assertSame($this->fw->getBox(), $this->fw->getContainer()->make('box'));
         $this->assertSame($this->fw, $this->fw->getContainer()->make(Fw::class));
         $this->assertSame($this->fw, $this->fw->getContainer()->make('fw'));
         $this->assertSame($this->fw->getContainer(), $this->fw->getContainer()->make(Di::class));
@@ -46,7 +43,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(array(), $this->fw->getQuery());
         $this->assertSame(array(), $this->fw->getFiles());
         $this->assertSame($_SERVER, $this->fw->getServer());
-        $this->assertSame($_ENV, $this->fw->getServerEnv());
+        $this->assertSame($_ENV, $this->fw->getEnv());
         $this->assertSame('GET', $this->fw->getVerb());
         $this->assertSame(true, $this->fw->isVerb('GET'));
         $this->assertSame(false, $this->fw->isVerb('POST'));
@@ -71,12 +68,13 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame('*/*', $this->fw->acceptBest());
         $this->assertSame('', $this->fw->getContentType());
         $this->assertSame('http://localhost', $this->fw->getBaseUrl());
-        $this->assertSame('prod', $this->fw->getEnv());
+        $this->assertSame('prod', $this->fw->getEnvironment());
+        $this->assertSame(true, $this->fw->isEnvironment('prod'));
         $this->assertSame(null, $this->fw->getProjectDir());
         $this->assertSame('2pk661ijd5ogk', $this->fw->getSeed());
 
         // mutate
-        $this->assertSame('post', $this->fw->setVerb('post')->getVerb());
+        $this->assertSame('POST', $this->fw->setVerb('post')->getVerb());
         $this->assertSame('/foo', $this->fw->setPath('/foo')->getPath());
         $this->assertSame('/foo', $this->fw->setPath('foo')->getPath());
         $this->assertSame('/foo', $this->fw->setBasePath('/foo')->getBasePath());
@@ -93,7 +91,7 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertSame(true, $this->fw->setDebug(true)->isDebug());
         $this->assertSame(true, $this->fw->setBuiltin(true)->isBuiltin());
         $this->assertSame('http://localhost/foo', $this->fw->setBaseUrl('http://localhost/foo')->getBaseUrl());
-        $this->assertSame('dev', $this->fw->setEnv('dev')->getEnv());
+        $this->assertSame('dev', $this->fw->setEnvironment('dev')->getEnvironment());
         $this->assertSame('dev', $this->fw->setProjectDir('dev//')->getProjectDir());
         $this->assertSame('dev', $this->fw->setSeed('dev')->getSeed());
     }
@@ -727,13 +725,12 @@ class FwTest extends \Codeception\Test\Unit
     {
         $this->fw->load(TEST_DATA . '/files/config.php')->run();
 
-        $box = $this->fw->getBox();
         $di = $this->fw->getContainer();
 
         $this->assertSame('home', $this->fw->getOutput());
-        $this->assertSame('bar', $box['foo']);
-        $this->assertSame(true, $box['from_callable']);
-        $this->assertSame(true, $box['is_cli']);
+        $this->assertSame('bar', $this->fw->foo);
+        $this->assertSame(true, $this->fw->from_callable);
+        $this->assertSame(true, $this->fw->is_cli);
         $this->assertInstanceOf('stdClass', $std = $di->make('foo'));
         $this->assertNotSame($std, $di->make('foo'));
         $this->assertNotSame($std, $di->make('stdClass'));
@@ -758,14 +755,16 @@ class FwTest extends \Codeception\Test\Unit
             'ENV' => array('foo' => 'bar'),
         ));
 
-        $this->assertSame('bar', $fw->getData('foo'));
+        $this->assertSame(true, $fw->has('foo'));
+        $this->assertSame('bar', $fw->get('foo'));
         $this->assertSame('bar', $fw->getFiles('foo'));
         $this->assertSame(null, $fw->getServer('REQUEST_METHOD'));
-        $this->assertSame('bar', $fw->getServerEnv('foo'));
+        $this->assertSame('bar', $fw->getEnv('foo'));
         $this->assertSame('100', $fw->getQuery('int'));
         $this->assertSame(100, $fw->getQueryInt('int'));
         $this->assertSame('100', $fw->getPost('int'));
         $this->assertSame(100, $fw->getPostInt('int'));
+        $this->assertSame($fw->path, $fw->getPath());
     }
 
     /** @dataProvider backUrlProvider */

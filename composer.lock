@@ -199,12 +199,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "4edc4d2914b0b65d891a1f690be95eb71bff534c"
+                "reference": "4da4aabba43fc1d9175191259330209638103f61"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/4edc4d2914b0b65d891a1f690be95eb71bff534c",
-                "reference": "4edc4d2914b0b65d891a1f690be95eb71bff534c",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/4da4aabba43fc1d9175191259330209638103f61",
+                "reference": "4da4aabba43fc1d9175191259330209638103f61",
                 "shasum": ""
             },
             "require": {
@@ -237,7 +237,7 @@
                 "issues": "https://github.com/eghojansu/php-utils/issues",
                 "source": "https://github.com/eghojansu/php-utils/tree/master"
             },
-            "time": "2022-03-12T16:26:52+00:00"
+            "time": "2022-03-19T13:31:52+00:00"
         }
     ],
     "packages-dev": [

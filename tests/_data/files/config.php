@@ -1,7 +1,5 @@
 <?php
 
-use Ekok\Container\Box;
-
 return array(
     'foo' => 'bar',
     'is_cli' => $fw->isCli(),
@@ -12,5 +10,5 @@ return array(
         ),
     ),
     'di@addRule # std class object' => array('foo', 'stdClass'),
-    static fn(Box $box) => $box->set('from_callable', true),
+    static fn() => $fw->set('from_callable', true),
 );

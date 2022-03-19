@@ -10,15 +10,8 @@ use Ekok\Utils\Str;
 use Ekok\Logger\Log;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
-use Ekok\Container\Box;
-use Ekok\App\Event\Controller as ControllerEvent;
-use Ekok\App\Event\ControllerArguments as ControllerArgumentsEvent;
-use Ekok\App\Event\Error as ErrorEvent;
-use Ekok\App\Event\Redirect as RedirectEvent;
-use Ekok\App\Event\Request as RequestEvent;
-use Ekok\App\Event\Response as ResponseEvent;
 use Ekok\EventDispatcher\Dispatcher;
-use Ekok\EventDispatcher\Event;
+use Ekok\EventDispatcher\Event as BaseEvent;
 use Ekok\Utils\Http;
 
 class Fw
@@ -31,13 +24,6 @@ class Fw
     private $routes = array();
     private $aliases = array();
 
-    public function __construct(private string|null $env, private Di $di, private array|null $data = null)
-    {
-        $this->di->inject($this, array('alias' => 'fw', 'name' => static::class));
-
-        $this->initialize();
-    }
-
     public static function create(string $env = null, array $data = null, array $rules = null)
     {
         return new static(
@@ -45,7 +31,6 @@ class Fw
             new Di(
                 array_replace_recursive(
                     array(
-                        Box::class => array('shared' => true, 'inherit' => false, 'alias' => 'box'),
                         Log::class => array('shared' => true, 'inherit' => false, 'alias' => 'log'),
                         Cache::class => array('shared' => true, 'inherit' => false, 'alias' => 'cache'),
                         Dispatcher::class => array('shared' => true, 'inherit' => false, 'alias' => 'dispatcher'),
@@ -57,14 +42,21 @@ class Fw
         );
     }
 
+    public function __construct(private string|null $env, private Di $di, private array|null $data = null)
+    {
+        $this->di->inject($this, array('alias' => 'fw', 'name' => static::class));
+
+        $this->initialize();
+    }
+
+    public function __get($name)
+    {
+        return $this->get($name);
+    }
+
     public function getContainer(): Di
     {
         return $this->di;
-    }
-
-    public function getBox(): Box
-    {
-        return $this->di->make(Box::class);
     }
 
     public function getLog(): Log
@@ -96,7 +88,7 @@ class Fw
         return $this;
     }
 
-    public function dispatch(Event $event, string $eventName = null, bool $once = false): static
+    public function dispatch(BaseEvent $event, string $eventName = null, bool $once = false): static
     {
         $this->getDispatcher()->dispatch($event, $eventName, $once);
 
@@ -117,9 +109,26 @@ class Fw
         return $this;
     }
 
-    public function getData(string $key = null)
+    public function has(string $key): bool
     {
-        return $key ? ($this->data[$key] ?? null) : $this->data;
+        return isset($this->data[$key]) || ($this->data && array_key_exists($key, $this->data));
+    }
+
+    public function get(string $key)
+    {
+        return $this->data[$key] ?? (method_exists($this, $get = 'get' . $key) ? $this->$get() : null);
+    }
+
+    public function set(string $key, $value): static
+    {
+        $this->data[$key] = $value;
+
+        return $this;
+    }
+
+    public function getData(): array
+    {
+        return $this->data ?? array();
     }
 
     public function load(string ...$files): static
@@ -143,7 +152,7 @@ class Fw
 
                     $this->di->callArguments($norm, $value);
                 } else {
-                    $this->getBox()->set($key, $value);
+                    $this->set($key, $value);
                 }
             });
         });
@@ -151,12 +160,17 @@ class Fw
         return $this;
     }
 
-    public function getEnv(): string
+    public function isEnvironment(string ...$envs): bool
+    {
+        return Str::equals($this->getEnvironment(), ...$envs);
+    }
+
+    public function getEnvironment(): string
     {
         return $this->env ?? 'prod';
     }
 
-    public function setEnv(string|null $env): static
+    public function setEnvironment(string|null $env): static
     {
         $this->env = $env ? strtolower($env) : null;
 
@@ -237,7 +251,7 @@ class Fw
 
     public function isDebug(): bool
     {
-        return $this->data['debug'] ?? ($this->data['debug'] = in_array($this->getEnv(), array('dev', 'development')));
+        return $this->data['debug'] ?? ($this->data['debug'] = $this->isEnvironment('dev', 'development'));
     }
 
     public function setDebug(bool $debug): static
@@ -295,12 +309,12 @@ class Fw
             $payload_ = $code->payload;
         }
 
-        $event = new ErrorEvent($code_, $message_, $headers_, $payload_, $error_);
+        $event = new Event\Error($code_, $message_, $headers_, $payload_, $error_);
 
         try {
             $this->dispatch($event, null, true);
         } catch (\Throwable $error) {
-            $event = new ErrorEvent(500, $error->getMessage() ?: null, error: $error);
+            $event = new Event\Error(500, $error->getMessage() ?: null, error: $error);
         }
 
         if (null === $event->getMessage()) {
@@ -388,7 +402,7 @@ class Fw
 
     public function redirect(string $url, bool $permanent = null, int $code = null): static
     {
-        $this->dispatch($event = new RedirectEvent($code ?? ($permanent ? 301 : 302), $url, $permanent));
+        $this->dispatch($event = new Event\Redirect($code ?? ($permanent ? 301 : 302), $url, $permanent));
 
         if (!$event->isPropagationStopped()) {
             $this->addHeader('Location', $event->getUrl());
@@ -560,7 +574,7 @@ class Fw
         return $name ? ($this->data['SERVER'][$name] ?? null) : $this->data['SERVER'];
     }
 
-    public function getServerEnv(string $name = null)
+    public function getEnv(string $name = null)
     {
         return $name ? ($this->data['ENV'][$name] ?? null) : $this->data['ENV'];
     }
@@ -720,9 +734,9 @@ class Fw
 
     public function isVerb(string ...$verbs): bool
     {
-        return $verbs && (
-            ($verb = $this->getVerb()) === $verbs[0]
-            || preg_grep('/^' . preg_quote($verb, '/') . '$/i', $verbs)
+        return (
+            Str::equals($this->getVerb(), ...$verbs)
+            || Str::equals(strtolower($this->getVerb()), ...$verbs)
         );
     }
 
@@ -735,7 +749,7 @@ class Fw
 
     public function setVerb(string $verb): static
     {
-        $this->data['verb'] = $verb;
+        $this->data['verb'] = strtoupper($verb);
 
         return $this;
     }
@@ -1363,7 +1377,7 @@ class Fw
         return $this;
     }
 
-    private function errorBuild(ErrorEvent $error): string|array
+    private function errorBuild(Event\Error $error): string|array
     {
         $debug = $this->isDebug();
         $data = array(
@@ -1479,7 +1493,7 @@ class Fw
 
     private function runInternal(): void
     {
-        $this->dispatch($event = new RequestEvent());
+        $this->dispatch($event = new Event\Request());
 
         if ($event->isPropagationStopped()) {
             $this->doResponse($event);
@@ -1499,11 +1513,11 @@ class Fw
 
         $this->data['match'] = $match;
 
-        $this->dispatch($event = new ControllerEvent($match['handler']));
+        $this->dispatch($event = new Event\Controller($match['handler']));
 
         $handler = $event->getController();
 
-        $this->dispatch($event = new ControllerArgumentsEvent($handler, $match['args']));
+        $this->dispatch($event = new Event\ControllerArguments($handler, $match['args']));
 
         $arguments = $event->getArguments();
 
@@ -1528,8 +1542,8 @@ class Fw
 
     private function doResponse($result, string $output = null, \Closure $getOutput = null, string|int $kbps = null): void
     {
-        if ($result instanceof RequestEvent) {
-            $event = new ResponseEvent(null);
+        if ($result instanceof Event\Request) {
+            $event = new Event\Response(null);
             $event->setOutput($result->getOutput() ?? $output);
             $event->setHeaders($result->getHeaders());
             $event->setCode($result->getCode());
@@ -1537,7 +1551,7 @@ class Fw
             $event->setMime($result->getMime());
             $event->setKbps($result->getKbps() ?? intval($kbps ?? 0));
         } else {
-            $event = new ResponseEvent($result, $output);
+            $event = new Event\Response($result, $output);
             $event->setKbps(intval($kbps ?? 0));
         }
 
