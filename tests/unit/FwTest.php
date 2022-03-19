@@ -970,4 +970,16 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->assertSame('foo', $this->fw->getOutput());
     }
+
+    public function testData()
+    {
+        $this->assertSame('POST', $this->fw->set('verb', 'post')->get('verb'));
+        $this->assertSame('bar', $this->fw->set('foo', 'bar')->get('foo'));
+        $this->assertSame('foo', $this->fw->setData(array('environment' => 'FOO'))->getEnvironment());
+
+        $this->expectException('LogicException');
+        $this->expectExceptionMessage('Data is readonly: env');
+
+        $this->fw->set('env', 'foo');
+    }
 }

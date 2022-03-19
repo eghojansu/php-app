@@ -121,7 +121,13 @@ class Fw
 
     public function set(string $key, $value): static
     {
-        $this->data[$key] = $value;
+        if (method_exists($this, $set = 'set' . $key)) {
+            $this->$set($value);
+        } elseif (method_exists($this, 'get' . $key)) {
+            throw new \LogicException(sprintf('Data is readonly: %s', $key));
+        } else {
+            $this->data[$key] = $value;
+        }
 
         return $this;
     }
@@ -129,6 +135,13 @@ class Fw
     public function getData(): array
     {
         return $this->data ?? array();
+    }
+
+    public function setData(array $data): static
+    {
+        array_walk($data, fn($value, $key) => $this->set($key, $value));
+
+        return $this;
     }
 
     public function load(string ...$files): static
