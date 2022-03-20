@@ -590,7 +590,7 @@ class FwTest extends \Codeception\Test\Unit
                     'options' => array(
                         'directory' => TEST_TMP . '/logs',
                         'filename' => 'log',
-                        'enabled' => true,
+                        'enable' => true,
                     ),
                 ),
             ),

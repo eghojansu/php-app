@@ -1343,10 +1343,11 @@ class Fw
         return $this;
     }
 
-    public function render(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
+    public function renderFind(string $file): string|null
     {
         $setup = $this->getRenderSetup();
-        $found = (
+
+        return (
             file_exists($found = $file)
             || (
                 $found = Arr::first(
@@ -1364,6 +1365,11 @@ class Fw
                 )
             )
         ) ? $found : null;
+    }
+
+    public function render(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
+    {
+        $found = $this->renderFind($file);
 
         if (!$found && $safe) {
             return $defaults;
