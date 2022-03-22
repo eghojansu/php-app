@@ -635,7 +635,10 @@ class Fw
 
     public function getBasePath(): string
     {
-        return $this->data['basepath'] ?? ($this->data['basepath'] = $this->isBuiltin() || $this->isCli() ? '' : Str::fixslashes(dirname($this->data['SERVER']['SCRIPT_NAME'] ?? '')));
+        return $this->data['basepath'] ?? ($this->data['basepath'] = $this->isBuiltin() || $this->isCli() ? '' : rtrim(
+            Str::fixslashes(dirname($this->data['SERVER']['SCRIPT_NAME'] ?? '')),
+            '/',
+        ));
     }
 
     public function setBasePath(string $basePath): static
