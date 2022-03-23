@@ -54,6 +54,22 @@ class Fw
         return $this->get($name);
     }
 
+    public function make(string $key, array $args = null)
+    {
+        return $this->di->make($key, $args);
+    }
+
+    public function rule(string|array $name, array|callable|string $rule = null): static
+    {
+        if (is_array($name)) {
+            $this->di->register($name);
+        } else {
+            $this->di->addRule($name, $rule);
+        }
+
+        return $this;
+    }
+
     public function getContainer(): Di
     {
         return $this->di;
@@ -61,17 +77,17 @@ class Fw
 
     public function getLog(): Log
     {
-        return $this->di->make(Log::class);
+        return $this->make(Log::class);
     }
 
     public function getCache(): Cache
     {
-        return $this->di->make(Cache::class);
+        return $this->make(Cache::class);
     }
 
     public function getDispatcher(): Dispatcher
     {
-        return $this->di->make(Dispatcher::class);
+        return $this->make(Dispatcher::class);
     }
 
     public function listen(string $eventName, callable|string $handler, int $priority = null, bool $once = false): static

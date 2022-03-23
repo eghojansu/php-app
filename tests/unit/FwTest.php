@@ -982,4 +982,26 @@ class FwTest extends \Codeception\Test\Unit
 
         $this->fw->set('env', 'foo');
     }
+
+    public function testDependency()
+    {
+        $this->fw->rule('foo', 'stdClass');
+        $this->fw->rule(array(
+            'bar' => array(
+                'shared' => true,
+                'class' => 'DateTime',
+            ),
+        ));
+
+        $std = $this->fw->make('foo');
+        $std2 = $this->fw->make('foo');
+        $date = $this->fw->make('bar');
+        $date2 = $this->fw->make('bar');
+
+        $this->assertInstanceOf('stdClass', $std);
+        $this->assertInstanceOf('stdClass', $std2);
+        $this->assertNotSame($std, $std2);
+        $this->assertInstanceOf('DateTime', $date);
+        $this->assertSame($date, $date2);
+    }
 }
