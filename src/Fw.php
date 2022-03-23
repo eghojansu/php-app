@@ -1422,9 +1422,8 @@ class Fw
         return $this;
     }
 
-    private function errorBuild(Event\Error $error): string|array
+    public function flattenError(Event\Error $error): array
     {
-        $debug = $this->isDebug();
         $data = array(
             'code' => $error->getCode(),
             'text' => $error->getText(),
@@ -1432,9 +1431,17 @@ class Fw
             'message' => $error->getMessage(),
         );
 
-        if ($debug) {
+        if ($this->isDebug()) {
             $data['trace'] = $error->getTrace();
         }
+
+        return $data;
+    }
+
+    private function errorBuild(Event\Error $error): string|array
+    {
+        $debug = $this->isDebug();
+        $data = $this->flattenError($error);
 
         if ($this->wantsJson()) {
             return $data;
