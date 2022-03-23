@@ -90,6 +90,13 @@ class Fw
         return $this->make(Dispatcher::class);
     }
 
+    public function addSubscribers(array $subscribers): static
+    {
+        $this->getDispatcher()->addSubscribers($subscribers);
+
+        return $this;
+    }
+
     public function listen(string $eventName, callable|string $handler, int $priority = null, bool $once = false): static
     {
         $this->getDispatcher()->on($eventName, $handler, $priority, $once);

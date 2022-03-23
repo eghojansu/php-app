@@ -9,6 +9,7 @@ use Ekok\App\Event\Redirect as RedirectEvent;
 use Ekok\App\Event\Request as RequestEvent;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event;
+use Ekok\EventDispatcher\EventSubscriberInterface;
 
 class FwTest extends \Codeception\Test\Unit
 {
@@ -1003,5 +1004,27 @@ class FwTest extends \Codeception\Test\Unit
         $this->assertNotSame($std, $std2);
         $this->assertInstanceOf('DateTime', $date);
         $this->assertSame($date, $date2);
+    }
+
+    public function testSubscriber()
+    {
+        $this->fw->addSubscribers(array(
+            new class implements EventSubscriberInterface {
+                public static function getSubscribedEvents(): array
+                {
+                    return array('foo');
+                }
+
+                public function foo(Event $event)
+                {
+                    $event->stopPropagation();
+                }
+            }
+        ));
+
+        $event = new Event();
+        $this->fw->dispatch($event, 'foo');
+
+        $this->assertTrue($event->isPropagationStopped());
     }
 }
