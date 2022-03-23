@@ -13,6 +13,7 @@ use Ekok\Container\Di;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event as BaseEvent;
 use Ekok\Utils\Http;
+use Ekok\Utils\HttpException;
 
 class Fw
 {

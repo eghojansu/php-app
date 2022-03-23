@@ -199,12 +199,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "4da4aabba43fc1d9175191259330209638103f61"
+                "reference": "0efea9fae3ae766849d33e4b77b40f1eb0ccdacb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/4da4aabba43fc1d9175191259330209638103f61",
-                "reference": "4da4aabba43fc1d9175191259330209638103f61",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/0efea9fae3ae766849d33e4b77b40f1eb0ccdacb",
+                "reference": "0efea9fae3ae766849d33e4b77b40f1eb0ccdacb",
                 "shasum": ""
             },
             "require": {
@@ -237,7 +237,7 @@
                 "issues": "https://github.com/eghojansu/php-utils/issues",
                 "source": "https://github.com/eghojansu/php-utils/tree/master"
             },
-            "time": "2022-03-19T13:31:52+00:00"
+            "time": "2022-03-23T02:44:36+00:00"
         }
     ],
     "packages-dev": [
@@ -1000,16 +1000,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.2.0",
+            "version": "2.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "6565c7e0db3231e92dd5ca3bed448b30fbc89eb1"
+                "reference": "c94a94f120803a18554c1805ef2e539f8285f9a2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/6565c7e0db3231e92dd5ca3bed448b30fbc89eb1",
-                "reference": "6565c7e0db3231e92dd5ca3bed448b30fbc89eb1",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/c94a94f120803a18554c1805ef2e539f8285f9a2",
+                "reference": "c94a94f120803a18554c1805ef2e539f8285f9a2",
                 "shasum": ""
             },
             "require": {
@@ -1095,7 +1095,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.2.0"
+                "source": "https://github.com/guzzle/psr7/tree/2.2.1"
             },
             "funding": [
                 {
@@ -1111,7 +1111,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2022-03-20T13:51:08+00:00"
+            "time": "2022-03-20T21:55:58+00:00"
         },
         {
             "name": "myclabs/deep-copy",
