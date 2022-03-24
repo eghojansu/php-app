@@ -1,8 +1,8 @@
 <?php
 
-use Ekok\App\Fw;
+use Ekok\App\Env;
 
-class FwExt extends Fw
+class MyEnv extends Env
 {
     public function isCustom(): bool
     {

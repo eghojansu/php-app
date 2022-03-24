@@ -15,7 +15,7 @@ use Ekok\EventDispatcher\Event as BaseEvent;
 use Ekok\Utils\Http;
 use Ekok\Utils\HttpException;
 
-class Fw
+class Env
 {
     const VAR_GLOBALS = 'GET|POST|COOKIE|FILES|SERVER|ENV';
     const ROUTE_VERBS = 'GET|POST|PUT|DELETE|HEAD|OPTIONS';
@@ -25,10 +25,10 @@ class Fw
     private $routes = array();
     private $aliases = array();
 
-    public static function create(string $env = null, array $data = null, array $rules = null)
+    public static function create(string $name = null, array $data = null, array $rules = null)
     {
         return new static(
-            $env,
+            $name,
             new Di(
                 array_replace_recursive(
                     array(
@@ -43,9 +43,9 @@ class Fw
         );
     }
 
-    public function __construct(private string|null $env, private Di $di, private array|null $data = null)
+    public function __construct(private string|null $name, private Di $di, private array|null $data = null)
     {
-        $this->di->inject($this, array('alias' => 'fw', 'name' => static::class));
+        $this->di->inject($this, array('alias' => 'env', 'name' => static::class));
 
         $this->initialize();
     }
@@ -171,7 +171,7 @@ class Fw
     public function load(string ...$files): static
     {
         array_walk($files, function (string $file) {
-            $data = File::load($file, array('fw' => $this)) ?? array();
+            $data = File::load($file, array('env' => $this)) ?? array();
 
             array_walk($data, function ($value, $key) {
                 if ($value instanceof \Closure) {
@@ -197,19 +197,19 @@ class Fw
         return $this;
     }
 
-    public function isEnvironment(string ...$envs): bool
+    public function isName(string ...$names): bool
     {
-        return Str::equals($this->getEnvironment(), ...$envs);
+        return Str::equals($this->getName(), ...$names);
     }
 
-    public function getEnvironment(): string
+    public function getName(): string
     {
-        return $this->env ?? 'prod';
+        return $this->name ?? 'prod';
     }
 
-    public function setEnvironment(string|null $env): static
+    public function setName(string|null $name): static
     {
-        $this->env = $env ? strtolower($env) : null;
+        $this->name = $name ? strtolower($name) : null;
 
         return $this;
     }
@@ -288,7 +288,7 @@ class Fw
 
     public function isDebug(): bool
     {
-        return $this->data['debug'] ?? ($this->data['debug'] = $this->isEnvironment('dev', 'development'));
+        return $this->data['debug'] ?? ($this->data['debug'] = $this->isName('dev', 'development'));
     }
 
     public function setDebug(bool $debug): static

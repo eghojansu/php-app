@@ -2,7 +2,7 @@
 
 return array(
     'foo' => 'bar',
-    'is_cli' => $fw->isCli(),
+    'is_cli' => $env->isCli(),
     '@routeAll' => array(
         array(
             'GET /' => static fn() => 'home',
@@ -10,5 +10,5 @@ return array(
         ),
     ),
     'di@addRule # std class object' => array('foo', 'stdClass'),
-    static fn() => $fw->set('from_callable', true),
+    static fn() => $env->set('from_callable', true),
 );
