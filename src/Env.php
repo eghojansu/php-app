@@ -539,7 +539,7 @@ class Env
 
     public function isContentType(string $mime): bool
     {
-        return !!preg_match('/^' . preg_quote($mime, '/') . '/i', $this->getContentType());
+        return !!preg_match('/\b' . preg_quote($mime, '/') . '\b/i', $this->getContentType());
     }
 
     public function isMultipart(): bool
