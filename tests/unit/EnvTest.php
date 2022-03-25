@@ -1106,4 +1106,18 @@ class EnvTest extends \Codeception\Test\Unit
             ),
         );
     }
+
+    public function testEnvironmentGetter()
+    {
+        $env = Env::create(null, array(
+            'SERVER' => array(
+                'HTTP_USER_AGENT' => 'test',
+                'HTTP_CLIENT_IP' => '127.0.0.1,127.1.1.1',
+            ),
+        ));
+
+        $this->assertSame('test', $env->getUserAgent());
+        $this->assertSame(gethostname(), $env->getServerIp());
+        $this->assertSame('127.0.0.1', $env->getClientIp());
+    }
 }

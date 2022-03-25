@@ -627,6 +627,35 @@ class Env
         return $name ? ($this->data['ENV'][$name] ?? null) : $this->data['ENV'];
     }
 
+    public function getServerIp(): string
+    {
+        return $this->data['SERVER_ADDR'] ?? gethostname();
+    }
+
+    public function getClientIp(): string|null
+    {
+        return Arr::first(
+            array(
+                'HTTP_CLIENT_IP',
+                'HTTP_X_FORWARDED_FOR',
+                'HTTP_X_FORWARDED',
+                'HTTP_X_CLUSTER_CLIENT_IP',
+                'HTTP_FORWARDED_FOR',
+                'HTTP_FORWARDED',
+                'REMOTE_ADDR',
+            ),
+            fn (string $key) => Arr::first(
+                explode(',', $this->data['SERVER'][$key] ?? ''),
+                static fn (string $ip) => filter_var($ip, FILTER_VALIDATE_IP, FILTER_NULL_ON_FAILURE),
+            ),
+        );
+    }
+
+    public function getUserAgent(): string|null
+    {
+        return $this->data['SERVER']['HTTP_USER_AGENT'] ?? null;
+    }
+
     public function wantsJson(): bool
     {
         return $this->accept('json');
