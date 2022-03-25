@@ -262,9 +262,9 @@ class Env
         return $this;
     }
 
-    public function getPreviousUrl(): string|null
+    public function getPreviousUrl(string $fallbackUrl = null): string|null
     {
-        return $this->data['previous_url'] ?? ($this->data['previous_url'] = $this->getResolvedPreviousUrl());
+        return $this->data['previous_url'] ?? ($this->data['previous_url'] = $this->getResolvedPreviousUrl() ?? $fallbackUrl);
     }
 
     public function setPreviousUrl(string $url): static
@@ -328,6 +328,14 @@ class Env
 
     public function error(\Throwable|int $code = 500, string $message = null, array $headers = null, array $payload = null): static
     {
+        if ($code instanceof Redirection) {
+            return match(true) {
+                $code->isBack => $this->redirectBack($code->url),
+                $code->isRoute => $this->redirectTo($code->url ?? '/', $code->args, $code->permanent, $code->statusCode),
+                default => $this->redirect($code->url ?? '/', $code->permanent, $code->statusCode),
+            };
+        }
+
         $error_ = null;
         $code_ = $code;
         $headers_ = $headers;
@@ -408,7 +416,7 @@ class Env
         return $path;
     }
 
-    public function url(string $path, array $args = null, bool $absolute = false, bool $entry = true): string
+    public function createUrl(string $path, array $args = null, bool $absolute = false, bool $entry = true): string
     {
         return (
             ($absolute ? $this->getBaseUrl() : $this->getBasePath()) .
@@ -417,9 +425,14 @@ class Env
         );
     }
 
+    public function url(string $path, array $args = null, bool $absolute = false): string
+    {
+        return $this->createUrl($path, $args, $absolute);
+    }
+
     public function baseurl(string $path, array $args = null, bool $absolute = false): string
     {
-        return $this->url($path, $args, $absolute, false);
+        return $this->createUrl($path, $args, $absolute, false);
     }
 
     public function uri(bool $absolute = true): string
@@ -453,13 +466,11 @@ class Env
     public function redirectTo(
         string $path,
         array $args = null,
-        bool $absolute = false,
-        bool $entry = true,
         bool $permanent = null,
         int $code = null,
     ): static {
         return $this->redirect(
-            $this->url($path, $args, $absolute, $entry),
+            $this->url($path, $args, true),
             $permanent,
             $code,
         );
@@ -467,7 +478,7 @@ class Env
 
     public function redirectBack(string $fallbackUrl = null): static
     {
-        return $this->redirect($this->getPreviousUrl() ?? $fallbackUrl ?? $this->url('/'), null, 303);
+        return $this->redirect($this->getPreviousUrl($fallbackUrl ?? $this->url('/')), null, 303);
     }
 
     public function routeAll(array $routes): static
@@ -1465,7 +1476,7 @@ class Env
         return strtr($template, Arr::quoteKeys($replace, '{}'));
     }
 
-    private function getResolvedPreviousUrl(): string
+    private function getResolvedPreviousUrl(): string|null
     {
         return match ($this->getNavigationMode()) {
             'header' => $this->headers($this->getNavigationKey()),
@@ -1473,7 +1484,7 @@ class Env
             'session' => $this->getSession($this->getNavigationKey()),
             'query' => urldecode($this->getQuery($this->getNavigationKey()) ?? ''),
             default => null,
-        } ?? '';
+        };
     }
 
     private function setBackUrlForNextRequest(string $url): void
@@ -1551,6 +1562,10 @@ class Env
         if ($event->isPropagationStopped()) {
             $this->doResponse($event);
 
+            return;
+        }
+
+        if ($this->sent()) {
             return;
         }
 

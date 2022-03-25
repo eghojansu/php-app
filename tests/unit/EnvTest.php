@@ -7,6 +7,7 @@ use Ekok\Container\Di;
 use Ekok\App\Event\Error as ErrorEvent;
 use Ekok\App\Event\Redirect as RedirectEvent;
 use Ekok\App\Event\Request as RequestEvent;
+use Ekok\App\Redirection;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event;
 use Ekok\EventDispatcher\EventSubscriberInterface;
@@ -440,6 +441,16 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('foo', $this->env->getOutput());
     }
 
+    public function testRunDirectInteruption()
+    {
+        $this->env->listen(RequestEvent::class, static function (Env $env) {
+            $env->send('my data');
+        });
+        $this->env->run();
+
+        $this->assertSame('my data', $this->env->getOutput());
+    }
+
     public function testRouteInvalid()
     {
         $this->expectException('LogicException');
@@ -817,7 +828,7 @@ class EnvTest extends \Codeception\Test\Unit
                 ),
             ),
             'from session' => array(
-                '',
+                null,
                 'http://localhost/',
                 array(
                     'mode' => 'session',
@@ -834,7 +845,7 @@ class EnvTest extends \Codeception\Test\Unit
                 ),
             ),
             'from none' => array(
-                '',
+                null,
                 'http://localhost/',
                 array(
                     'mode' => 'none',
@@ -936,7 +947,7 @@ class EnvTest extends \Codeception\Test\Unit
         });
         $this->env->redirectTo('home');
 
-        $expected = '[302 - Found] GET / redirected to /home';
+        $expected = '[302 - Found] GET / redirected to http://localhost/home';
         $actual = $this->env->getOutput();
 
         $this->assertSame($expected, $actual);
@@ -1026,5 +1037,73 @@ class EnvTest extends \Codeception\Test\Unit
         $this->env->dispatch($event, 'foo');
 
         $this->assertTrue($event->isPropagationStopped());
+    }
+
+    /** @dataProvider redirectionByExceptionProvider */
+    public function testRedirectionByException(string $expected, array $data = null)
+    {
+        $env = Env::create(null, $data)->setQuiet(true);
+        $env->routeAll(array(
+            'GET /' => static fn() => 'Welcome home',
+            'GET @route.foo /foo' => static fn() => 'Foo page',
+            'GET /go-to-home' => static fn() => throw new Redirection(),
+            'GET /go-to-home2' => static fn() => throw Redirection::url('/'),
+            'GET /go-to-foo' => static fn() => throw Redirection::to('route.foo'),
+            'GET /go-back' => static fn() => throw Redirection::back(),
+        ));
+        $env->listen('onRedirect', static function (RedirectEvent $event, Env $env) {
+            $event->setOutput(sprintf(
+                '[%s - %s] %s %s redirected to %s%s',
+                $event->getCode(),
+                $event->getText(),
+                $env->getVerb(),
+                $env->getPath(),
+                $event->getUrl(),
+                $event->isPermanent() ? ' [permanent]' : '',
+            ));
+        });
+        $env->run();
+
+        $actual = $env->getOutput();
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function redirectionByExceptionProvider()
+    {
+        return array(
+            'go home' => array(
+                '[302 - Found] GET /go-to-home redirected to /',
+                array(
+                    'SERVER' => array(
+                        'REQUEST_URI' => '/go-to-home',
+                    ),
+                ),
+            ),
+            'go home2' => array(
+                '[302 - Found] GET /go-to-home2 redirected to /',
+                array(
+                    'SERVER' => array(
+                        'REQUEST_URI' => '/go-to-home2',
+                    ),
+                ),
+            ),
+            'go back' => array(
+                '[303 - See Other] GET /go-back redirected to /',
+                array(
+                    'SERVER' => array(
+                        'REQUEST_URI' => '/go-back',
+                    ),
+                ),
+            ),
+            'go route' => array(
+                '[302 - Found] GET /go-to-foo redirected to http://localhost/foo',
+                array(
+                    'SERVER' => array(
+                        'REQUEST_URI' => '/go-to-foo',
+                    ),
+                ),
+            ),
+        );
     }
 }
