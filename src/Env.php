@@ -629,7 +629,7 @@ class Env
 
     public function getServerIp(): string
     {
-        return $this->data['SERVER_ADDR'] ?? gethostname();
+        return $this->data['SERVER']['SERVER_ADDR'] ?? gethostname();
     }
 
     public function getClientIp(): string|null
