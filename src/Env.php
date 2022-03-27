@@ -12,8 +12,6 @@ use Ekok\Cache\Cache;
 use Ekok\Container\Di;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event as BaseEvent;
-use Ekok\Utils\Http;
-use Ekok\Utils\HttpException;
 
 class Env
 {
@@ -27,14 +25,16 @@ class Env
 
     public static function create(string $name = null, array $data = null, array $rules = null)
     {
+        $rule = array('shared' => true, 'alias' => true, 'inherit' => false);
+
         return new static(
             $name,
             new Di(
                 array_replace_recursive(
                     array(
-                        Log::class => array('shared' => true, 'inherit' => false, 'alias' => 'log'),
-                        Cache::class => array('shared' => true, 'inherit' => false, 'alias' => 'cache'),
-                        Dispatcher::class => array('shared' => true, 'inherit' => false, 'alias' => 'dispatcher'),
+                        'log' => $rule + array('class' => Log::class),
+                        'cache' => $rule + array('class' => Cache::class),
+                        'dispatcher' => $rule + array('class' => Dispatcher::class),
                     ),
                     $rules ?? array(),
                 ),
@@ -45,8 +45,7 @@ class Env
 
     public function __construct(private string|null $name, private Di $di, private array|null $data = null)
     {
-        $this->di->inject($this, array('alias' => 'env', 'name' => static::class));
-
+        $this->registerSelf();
         $this->initialize();
     }
 
@@ -91,6 +90,16 @@ class Env
         return $this->make(Dispatcher::class);
     }
 
+    public function call(string|callable $cb, ...$args)
+    {
+        return $this->di->call($cb, ...$args);
+    }
+
+    public function callArguments(string|callable $cb, array $args = null)
+    {
+        return $this->di->callArguments($cb, $args);
+    }
+
     public function addSubscribers(array $subscribers): static
     {
         $this->getDispatcher()->addSubscribers($subscribers);
@@ -128,7 +137,7 @@ class Env
 
     public function chain(callable|string $cb): static
     {
-        $this->di->call($cb);
+        $this->call($cb);
 
         return $this;
     }
@@ -175,7 +184,7 @@ class Env
 
             array_walk($data, function ($value, $key) {
                 if ($value instanceof \Closure) {
-                    $this->di->call($value);
+                    $this->call($value);
                 } elseif (
                     is_string($key)
                     && is_array($value)
@@ -187,7 +196,7 @@ class Env
                     $call = $expr ? $key : static::class . $key;
                     $norm = rtrim(strstr($call . '#', '#', true));
 
-                    $this->di->callArguments($norm, $value);
+                    $this->callArguments($norm, $value);
                 } else {
                     $this->set($key, $value);
                 }
@@ -298,16 +307,42 @@ class Env
         return $this;
     }
 
+    public function getLanguageKey(): string
+    {
+        return $this->data['language_key'] ?? 'lang';
+    }
+
+    public function setLanguageKey(string $language): static
+    {
+        $this->data['language_key'] = $language;
+
+        return $this;
+    }
+
+    public function getCors(): array|null
+    {
+        return $this->data['cors'] ?? null;
+    }
+
+    public function setCors(array $cors): static
+    {
+        $this->data['cors'] = array_replace(
+            $this->data['cors'] ?? array(
+				'headers' => '',
+				'origin' => false,
+				'credentials' => false,
+				'expose' => false,
+				'ttl'=> 0,
+            ),
+            $cors,
+        );
+
+        return $this;
+    }
+
     public function isBuiltin(): bool
     {
         return $this->data['builtin'] ?? ($this->data['builtin'] = 'cli-server' === PHP_SAPI);
-    }
-
-    public function setBuiltin(bool $builtin): static
-    {
-        $this->data['builtin'] = $builtin;
-
-        return $this;
     }
 
     public function isCli(): bool
@@ -481,6 +516,11 @@ class Env
         return $this->redirect($this->getPreviousUrl($fallbackUrl ?? $this->url('/')), null, 303);
     }
 
+    public function getRoutes(): array
+    {
+        return $this->routes;
+    }
+
     public function routeAll(array $routes): static
     {
         array_walk($routes, fn ($handler, $route) => $this->route($route, $handler));
@@ -529,14 +569,14 @@ class Env
         return $this->route($route, fn () => $this->redirect($url, $permanent));
     }
 
-    public function routeMatch(string $path = null, string $method = null): array|null
+    public function routeMatch(string $path = null, string $method = null, array &$founds = null): array|null
     {
-        $path_ = $path ?? $this->getPath();
-        $method_ = $method ?? $this->getVerb();
+        $wPath = $path ?? $this->getPath();
+        $wVerb = $method ?? $this->getVerb();
 
         $args = null;
-        $found = $this->routes[$path_] ?? $this->routeFind($path_, $args);
-        $handler = $found[$method_] ?? $found[strtoupper($method_)] ?? null;
+        $founds = $this->routes[$wPath] ?? $this->routeFind($wPath, $args);
+        $handler = $founds[$wVerb] ?? $founds[strtoupper($wVerb)] ?? null;
 
         return $handler ? $handler + compact('args') : null;
     }
@@ -632,8 +672,14 @@ class Env
         return $this->data['SERVER']['SERVER_ADDR'] ?? gethostname();
     }
 
-    public function getClientIp(): string|null
+    public function getClientIp(string|int|null $version = null, string ...$ranges): string|null
     {
+        $options = FILTER_NULL_ON_FAILURE | array_reduce(
+            $ranges,
+            fn (int $options, string $range) => $options | (defined($flag = 'FILTER_FLAG_' . strtoupper($range) . '_RANGE') ? constant($flag) : 0),
+            $version && defined($flag = 'FILTER_FLAG_IPV' . $version) ? constant($flag) : FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6,
+        );
+
         return Arr::first(
             array(
                 'HTTP_CLIENT_IP',
@@ -646,7 +692,7 @@ class Env
             ),
             fn (string $key) => Arr::first(
                 explode(',', $this->data['SERVER'][$key] ?? ''),
-                static fn (string $ip) => filter_var($ip, FILTER_VALIDATE_IP, FILTER_NULL_ON_FAILURE),
+                static fn (string $ip) => filter_var(trim($ip), FILTER_VALIDATE_IP, $options),
             ),
         );
     }
@@ -656,43 +702,73 @@ class Env
         return $this->data['SERVER']['HTTP_USER_AGENT'] ?? null;
     }
 
+    public function getAuthorization(): string|null
+    {
+        return $this->data['SERVER']['HTTP_AUTHORIZATION'] ?? null;
+    }
+
+    public function getAuthorizationBearer(): string|null
+    {
+        return sscanf($this->getAuthorization() ?? '', 'Bearer %s', $token) > 0 ? $token : null;
+    }
+
     public function wantsJson(): bool
     {
         return $this->accept('json');
     }
 
-    public function accept(string $mime): bool
+    public function accept(string $mime = null, bool $all = false): array|string|bool
     {
-        return !!preg_match('/\b' . preg_quote($mime, '/') . '\b/i', $this->headers('accept') ?? '*/*');
+        $accept = $this->data['SERVER']['HTTP_ACCEPT'] ?? '*/*';
+
+        return match(true) {
+            !!$mime => !!preg_match('/\b' . preg_quote($mime, '/') . '\b/i', $accept),
+            $all => array_column(Http::parseHeader($accept), 'content'),
+            default => Http::parseHeader($accept)[0]['content'],
+        };
     }
 
-    public function acceptBest(): string
+    public function acceptLanguage(string $lang = null, bool $all = false): array|string|bool
     {
-        return Http::parseHeader($this->headers('accept') ?? '')[0] ?? '*/*';
+        $accept = $this->data['SERVER']['HTTP_ACCEPT_LANGUAGE'] ?? '*';
+
+        return match(true) {
+            !!$lang => !!preg_match('/\b' . preg_quote($lang, '/') . '\b/i', $accept),
+            $all => array_column(Http::parseHeader($accept), 'content'),
+            default => Http::parseHeader($accept)[0]['content'],
+        };
+    }
+
+    public function wantLanguage(): string|null
+    {
+        return (
+            $this->data['GET'][$key = $this->getLanguageKey()]
+            ?? $this->session($key)
+            ?? (trim($this->acceptLanguage(), '*') ?: null)
+        );
     }
 
     public function headers(string $key = null): array|string|null
     {
-        $srv = $this->data['SERVER'] ?? array();
-
         if ($key) {
             return (
-                $srv[$key] ??
-                $srv[$upper = strtoupper(str_replace('-', '_', $key))] ??
-                $srv['HTTP_' . $upper] ?? null
+                $this->data['SERVER'][$key]
+                ?? $this->data['SERVER'][$upper = strtoupper(str_replace('-', '_', $key))]
+                ?? $this->data['SERVER']['HTTP_' . $upper]
+                ?? null
             );
         }
 
         return Arr::reduce(
-            $srv,
+            $this->data['SERVER'] ?? array(),
             static fn ($headers, $header, $key) => $headers + (
                 str_starts_with($key, 'HTTP_') ?
                     array(ucwords(strtolower(str_replace('_', '-', substr($key, 5))), '-') => $header) :
                     array()
             ),
             array(
-                'Content-Type' => $srv['CONTENT_TYPE'] ?? null,
-                'Content-Length' => $srv['CONTENT_LENGTH'] ?? null,
+                'Content-Type' => $this->data['SERVER']['CONTENT_TYPE'] ?? null,
+                'Content-Length' => $this->data['SERVER']['CONTENT_LENGTH'] ?? null,
             ),
         );
     }
@@ -1172,6 +1248,17 @@ class Env
         return $this->data['buffering_level'] ?? null;
     }
 
+    public function startBuffering(): bool
+    {
+        if ($this->isBuffering()) {
+            $this->data['buffering_level'] = ob_get_level();
+
+            return ob_start();
+        }
+
+        return false;
+    }
+
     public function stopBuffering(): array
     {
         $buffers = array();
@@ -1253,7 +1340,7 @@ class Env
         $this->stopBuffering();
 
         if (is_callable($value)) {
-            $this->di->call($value);
+            $this->call($value);
         } elseif ($shout) {
             $this->shoutText($output, $kbps);
         }
@@ -1270,7 +1357,7 @@ class Env
         }
 
         $lastModified = filemtime($file);
-        $modifiedSince = $this->headers('if_modified_since');
+        $modifiedSince = $this->data['SERVER']['HTTP_IF_MODIFIED_SINCE'] ?? null;
 
         $this->addHeader('Last-Modified', Http::stamp($lastModified));
 
@@ -1286,7 +1373,7 @@ class Env
         $status = 200;
         $offset = 0;
         $length = $size;
-        $header = $range ? $this->headers('range') : null;
+        $header = $range ? ($this->data['SERVER']['HTTP_RANGE'] ?? null) : null;
 
         if ($header && !preg_match('/^bytes=(?:(\d+)-(\d+)?)|(?:\-(\d+))/', $header, $parts, PREG_UNMATCHED_AS_NULL)) {
             return $this->send(status: 416, headers: array('Content-Range' => sprintf('bytes */%u', $size)));
@@ -1589,12 +1676,8 @@ class Env
         $this->dispatch($event = new Event\Request());
 
         if ($event->isPropagationStopped()) {
-            $this->doResponse($event);
+            $this->sent() || $this->doResponse($event);
 
-            return;
-        }
-
-        if ($this->sent()) {
             return;
         }
 
@@ -1602,36 +1685,45 @@ class Env
             throw new \LogicException('No route defined');
         }
 
-        $match = $this->routeMatch();
+        $match = $this->routeMatch(null, null, $routes);
 
-        if (!$match) {
-            throw new HttpException(404);
+        $this->setHeaders($this->preCors($cors, $preflight));
+
+        if (!$routes || (!$match && !$this->isVerb('OPTIONS'))) {
+            throw Http::errorNotFound();
         }
 
-        $this->data['match'] = $match;
+        $result = null;
+        $output = null;
 
-        $this->dispatch($event = new Event\Controller($match['handler']));
+        if ($match) {
+            $this->data['match'] = $match;
 
-        $handler = $event->getController();
+            $this->dispatch($event = new Event\Controller($match['handler'] ?? null));
 
-        $this->dispatch($event = new Event\ControllerArguments($handler, $match['args']));
+            $handler = $event->getController();
 
-        $arguments = $event->getArguments();
+            $this->dispatch($event = new Event\ControllerArguments($handler, $match['args'] ?? array()));
 
-        list($result, $output) = $this->runHandle($handler, $arguments);
+            $arguments = $event->getArguments();
 
+            list($result, $output) = $this->runHandle($handler, $arguments);
+        }
+
+        if ($this->isVerb('OPTIONS')) {
+            $result = null;
+            $output = null;
+        }
+
+        $this->setHeaders($this->postCors(array_keys($routes), $cors));
         $this->doResponse($result, $output, null, $match['kbps'] ?? 0);
     }
 
     private function runHandle(string|callable $handler, array|null $args): array
     {
-        if ($this->isBuffering()) {
-            $this->data['buffering_level'] = ob_get_level();
+        $this->startBuffering();
 
-            ob_start();
-        }
-
-        $result = $this->di->callArguments($handler, $args);
+        $result = $this->callArguments($handler, $args);
         $output = $this->stopBuffering();
 
         return array($result, $output[0] ?? null);
@@ -1655,7 +1747,7 @@ class Env
         $this->dispatch($event);
 
         if (is_callable($response = $event->getResult())) {
-            $this->di->call($response);
+            $this->call($response);
         } elseif (
             !$response ||
             ($raw = is_scalar($response) || is_array($response) || $response instanceof \Stringable)
@@ -1670,7 +1762,64 @@ class Env
         }
     }
 
-    protected function initialize(): void
+    private function preCors(bool &$cors = null, bool &$preflight = null): array
+    {
+        $setup = $this->getCors();
+        $cors = false;
+        $preflight = false;
+        $origin = $this->data['SERVER']['HTTP_ORIGIN'] ?? null;
+        $headers = array();
+
+		if ($origin && ($allowOrigin = $setup['origin'] ?? null)) {
+            $cors = true;
+			$preflight = isset($this->data['SERVER']['HTTP_ACCESS_CONTROL_REQUEST_METHOD']);
+
+            $headers['Access-Control-Allow-Origin'] = true === $allowOrigin ? $origin : $allowOrigin;
+            $headers['Access-Control-Allow-Credentials'] = var_export($setup['credentials'] ?? false, true);
+		}
+
+        return $headers;
+    }
+
+    private function postCors(array $verbs, bool $cors): array
+    {
+        $setup = $this->getCors();
+        $allowed = implode(',', $verbs);
+        $headers = array();
+
+        if ($cors && ($setup['expose'] ?? null)) {
+            $headers['Access-Control-Expose-Headers'] = $setup['expose'];
+        }
+
+        if (!$this->hasHeader('Allow')) {
+            $headers['Allow'] = $allowed;
+        }
+
+        if ($cors && !$this->hasHeader('Access-Control-Allow-Methods')) {
+            $headers['Access-Control-Allow-Methods'] = 'OPTIONS,' . $allowed;
+        }
+
+        if ($cors && ($setup['headers'] ?? null) && !$this->hasHeader('Access-Control-Allow-Headers')) {
+            $headers['Access-Control-Allow-Headers'] = $setup['headers'];
+        }
+
+        if ($cors && ($setup['ttl'] ?? null)) {
+            $headers['Access-Control-Max-Age'] = var_export($setup['ttl'], true);
+        }
+
+        return $headers;
+    }
+
+    private function registerSelf(): void
+    {
+        $this->di->inject($this, array('alias' => 'env', 'name' => static::class));
+
+        if (self::class !== static::class) {
+            $this->di->addAlias(self::class, static::class);
+        }
+    }
+
+    private function registerGlobals(): void
     {
         $globals = explode('|', self::VAR_GLOBALS);
 
@@ -1679,11 +1828,10 @@ class Env
                 $this->data[$global] = $GLOBALS['_' . $global] ?? array();
             }
         });
+    }
 
-        if (self::class !== static::class) {
-            $this->di->addAlias(self::class, static::class);
-        }
-
+    private function registerErrorTemplate(): void
+    {
         $this->data['error_template']['html'] =
         <<<'HTML'
 <!doctype html>
@@ -1709,6 +1857,17 @@ HTML;
 {trace}
 
 TEXT;
+    }
+
+    private function registerExceptionHandler(): void
+    {
         set_exception_handler(fn(\Throwable $error) => $this->error($error));
+    }
+
+    protected function initialize(): void
+    {
+        $this->registerGlobals();
+        $this->registerErrorTemplate();
+        $this->registerExceptionHandler();
     }
 }

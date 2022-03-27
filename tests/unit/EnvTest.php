@@ -19,9 +19,18 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function _before()
     {
-        $this->env = Env::create(null, array('quiet' => true));
+        $this->env = self::createEnv();
 
         header_remove();
+    }
+
+    private static function createEnv(array $data = null, array $rules = null, bool $quiet = true): Env
+    {
+        if (!isset($data['quiet'])) {
+            $data['quiet'] = $quiet;
+        }
+
+        return Env::create('test', $data, $rules);
     }
 
     public function testDependencies()
@@ -67,13 +76,19 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame(false, $this->env->wantsJson());
         $this->assertSame(false, $this->env->isMultipart());
         $this->assertSame(false, $this->env->accept('json'));
-        $this->assertSame('*/*', $this->env->acceptBest());
+        $this->assertSame('*/*', $this->env->accept());
+        $this->assertSame(array('*/*'), $this->env->accept(null, true));
+        $this->assertSame(false, $this->env->acceptLanguage('json'));
+        $this->assertSame('*', $this->env->acceptLanguage());
+        $this->assertSame(array('*'), $this->env->acceptLanguage(null, true));
         $this->assertSame('', $this->env->getContentType());
         $this->assertSame('http://localhost', $this->env->getBaseUrl());
-        $this->assertSame('prod', $this->env->getName());
-        $this->assertSame(true, $this->env->isName('prod'));
+        $this->assertSame('test', $this->env->getName());
+        $this->assertSame(true, $this->env->isName('test'));
         $this->assertSame(null, $this->env->getProjectDir());
         $this->assertSame('3lxu8sqeg7sw8', $this->env->getSeed());
+        $this->assertSame('lang', $this->env->getLanguageKey());
+        $this->assertCount(0, $this->env->getRoutes());
 
         // mutate
         $this->assertSame('POST', $this->env->setVerb('post')->getVerb());
@@ -91,11 +106,11 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('text/html', $this->env->setMime('text/html')->getMime());
         $this->assertSame('UTF-88', $this->env->setCharset('UTF-88')->getCharset());
         $this->assertSame(true, $this->env->setDebug(true)->isDebug());
-        $this->assertSame(true, $this->env->setBuiltin(true)->isBuiltin());
         $this->assertSame('http://localhost/foo', $this->env->setBaseUrl('http://localhost/foo')->getBaseUrl());
         $this->assertSame('dev', $this->env->setName('dev')->getName());
         $this->assertSame('dev', $this->env->setProjectDir('dev//')->getProjectDir());
         $this->assertSame('dev', $this->env->setSeed('dev')->getSeed());
+        $this->assertSame('_lang', $this->env->setLanguageKey('_lang')->getLanguageKey());
     }
 
     public function testResponse()
@@ -184,9 +199,9 @@ class EnvTest extends \Codeception\Test\Unit
     }
 
     /** @dataProvider sendFileProvider */
-    public function testSendFile(array|string $expected, array $env = null, ...$args)
+    public function testSendFile(array|string $expected, array $data = null, ...$args)
     {
-        $env = Env::create(null, $env);
+        $env = self::createEnv($data);
 
         list($output, $code) = ((array) $expected) + array('', 200);
 
@@ -310,9 +325,9 @@ class EnvTest extends \Codeception\Test\Unit
     }
 
     /** @dataProvider runProvider */
-    public function testRun($expected, array $env = null)
+    public function testRun($expected, array $data = null)
     {
-        $env = Env::create(null, ($env ?? array()) + array('quiet' => true));
+        $env = self::createEnv($data);
         $env->setErrorTemplate('cli', '[CLI] {message}');
         $env->setErrorTemplate('html', '[HTML] {message}');
 
@@ -415,7 +430,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testRunErrorJson()
     {
-        $env = Env::create(null, array(
+        $env = self::createEnv(array(
             'quiet' => true,
             'debug' => true,
             'SERVER' => array(
@@ -503,7 +518,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testUrl()
     {
-        $env = Env::create(null, array(
+        $env = self::createEnv(array(
             'cli' => false,
             'SERVER' => array(
                 'REQUEST_URI' => '/basedir/front.php/path',
@@ -566,7 +581,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testHeaders()
     {
-        $env = Env::create(null, array(
+        $env = self::createEnv(array(
             'SERVER' => array(
                 'CONTENT_TYPE' => 'text/plain',
                 'HTTP_ACCEPT' => 'json',
@@ -594,9 +609,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testLogged()
     {
-        $env = Env::create(null, array(
-            'quiet' => true,
-        ), array(
+        $env = self::createEnv(null, array(
             Log::class => array(
                 'params' => array(
                     'options' => array(
@@ -759,7 +772,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testDataGetter()
     {
-        $env = Env::create(null, array(
+        $env = self::createEnv(array(
             'foo' => 'bar',
             'GET' => array('int' => '100'),
             'POST' => array('int' => '100'),
@@ -782,7 +795,7 @@ class EnvTest extends \Codeception\Test\Unit
     /** @dataProvider backUrlProvider */
     public function testSetBackUrl(string|null $prevUrl, string|null $backUrl, array $data = null)
     {
-        $env = Env::create(null, array('quiet' => true) + ($data ?? array()));
+        $env = self::createEnv($data);
 
         if (isset($data['mode'])) {
             $env->setNavigationMode($data['mode']);
@@ -894,7 +907,7 @@ class EnvTest extends \Codeception\Test\Unit
     /** @dataProvider reroutingProvider */
     public function testRerouting(string $expected, array $data = null)
     {
-        $env = Env::create(null, array('quiet' => true) + ($data ?? array()));
+        $env = self::createEnv($data);
         $env->rerouteAll(array(
             'GET /' => 'home',
             'GET /temporary' => array('base', false),
@@ -1042,7 +1055,7 @@ class EnvTest extends \Codeception\Test\Unit
     /** @dataProvider redirectionByExceptionProvider */
     public function testRedirectionByException(string $expected, array $data = null)
     {
-        $env = Env::create(null, $data)->setQuiet(true);
+        $env = self::createEnv($data);
         $env->routeAll(array(
             'GET /' => static fn() => 'Welcome home',
             'GET @route.foo /foo' => static fn() => 'Foo page',
@@ -1109,7 +1122,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testEnvironmentGetter()
     {
-        $env = Env::create(null, array(
+        $env = self::createEnv(array(
             'SERVER' => array(
                 'HTTP_USER_AGENT' => 'test',
                 'HTTP_CLIENT_IP' => '127.0.0.1,127.1.1.1',
@@ -1119,5 +1132,100 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('test', $env->getUserAgent());
         $this->assertSame(gethostname(), $env->getServerIp());
         $this->assertSame('127.0.0.1', $env->getClientIp());
+    }
+
+    public function testRecommendedLanguage()
+    {
+        $env = self::createEnv(array(
+            'SERVER' => array(
+                'HTTP_ACCEPT_LANGUAGE' => 'en',
+            ),
+        ));
+
+        $this->assertSame('en', $env->wantLanguage());
+    }
+
+    public function testAuthorization()
+    {
+        $env = self::createEnv(array(
+            'SERVER' => array(
+                'HTTP_AUTHORIZATION' => 'Bearer foo',
+            ),
+        ));
+
+        $this->assertSame('Bearer foo', $env->getAuthorization());
+        $this->assertSame('foo', $env->getAuthorizationBearer());
+    }
+
+    public function testDirectCall()
+    {
+        $this->expectOutputString('printed directly');
+
+        $env = self::createEnv(array(
+            'buffering' => false,
+            'quiet' => false,
+            'SERVER' => array(
+                'REQUEST_URI' => '/direct-call',
+            ),
+        ));
+        $env->route('GET /direct-call', static function() {
+            echo 'printed directly';
+        });
+        $env->run();
+    }
+
+    public function testEventOrder()
+    {
+        $handle = static fn($name) => static function(RequestEvent $event) use ($name) {
+            $output = $event->getOutput();
+            $output[] = $name;
+
+            $event->setOutput($output);
+        };
+
+        $this->env->listen('onRequest', $handle('a'));
+        $this->env->listen('onRequest', $handle('b'));
+        $this->env->listen('onRequest', $handle('c'));
+        $this->env->listen('onRequest', $handle('d'), 1);
+        $this->env->listen('onRequest', $handle('e'), -99);
+
+        $this->env->dispatch($event = new RequestEvent());
+
+        $actual = $event->getOutput();
+        $expected = array('d', 'a', 'b', 'c', 'e');
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function testCors()
+    {
+        $env = self::createEnv(array(
+            'SERVER' => array(
+                'REQUEST_METHOD' => 'OPTIONS',
+                'HTTP_ORIGIN' => 'http://foo.com',
+            ),
+        ));
+        $env->setCors(array(
+            'origin' => true,
+            'expose' => 'Expose-Foo',
+            'headers' => 'Allow-Foo',
+            'credentials' => true,
+            'ttl' => 600,
+        ));
+        $env->routeAll(array(
+            'GET /' => static fn() => 'get home',
+            'POST /' => static fn() => 'post home',
+        ));
+        $env->run();
+
+        $headers = $env->getHeaders();
+
+        $this->assertSame('http://foo.com', $headers['Access-Control-Allow-Origin'][0]);
+        $this->assertSame('true', $headers['Access-Control-Allow-Credentials'][0]);
+        $this->assertSame('Expose-Foo', $headers['Access-Control-Expose-Headers'][0]);
+        $this->assertSame('GET,POST', $headers['Allow'][0]);
+        $this->assertSame('OPTIONS,GET,POST', $headers['Access-Control-Allow-Methods'][0]);
+        $this->assertSame('Allow-Foo', $headers['Access-Control-Allow-Headers'][0]);
+        $this->assertSame('600', $headers['Access-Control-Max-Age'][0]);
     }
 }

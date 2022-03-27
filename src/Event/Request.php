@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Ekok\App\Event;
 
-use Ekok\Utils\Http;
+use Ekok\App\Http;
 
 class Request extends Event
 {

@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b9cffecb7877112cdc04b30d5cfa2b77",
+    "content-hash": "70635e91252cb3a687ecd57beeaea8a1",
     "packages": [
         {
             "name": "ekok/php-cache",
-            "version": "dev-master",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-cache.git",
-                "reference": "f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1"
+                "reference": "5715669f38fef596e15546f2a581c14c0a3e4518"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1",
-                "reference": "f02ff79f8aa9e34effddbf07fc7c17c30acfd6f1",
+                "url": "https://api.github.com/repos/eghojansu/php-cache/zipball/5715669f38fef596e15546f2a581c14c0a3e4518",
+                "reference": "5715669f38fef596e15546f2a581c14c0a3e4518",
                 "shasum": ""
             },
             "require": {
@@ -28,7 +28,6 @@
                 "codeception/module-asserts": "^1.0.0",
                 "codeception/module-phpbrowser": "^1.0.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -48,26 +47,26 @@
             "description": "PHP Cache",
             "support": {
                 "issues": "https://github.com/eghojansu/php-cache/issues",
-                "source": "https://github.com/eghojansu/php-cache/tree/master"
+                "source": "https://github.com/eghojansu/php-cache/tree/v0.1.0"
             },
-            "time": "2022-03-11T14:56:13+00:00"
+            "time": "2022-03-27T08:09:03+00:00"
         },
         {
             "name": "ekok/php-container",
-            "version": "dev-master",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-container.git",
-                "reference": "4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7"
+                "reference": "9267a82cbc2e4d70fafa466fdaa10c7110ede760"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7",
-                "reference": "4f39f54b8ff6e6c76b8920a7a9e2631e60b1fec7",
+                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/9267a82cbc2e4d70fafa466fdaa10c7110ede760",
+                "reference": "9267a82cbc2e4d70fafa466fdaa10c7110ede760",
                 "shasum": ""
             },
             "require": {
-                "ekok/php-utils": "dev-master",
+                "ekok/php-utils": "^0",
                 "php": ">=8.0"
             },
             "require-dev": {
@@ -75,7 +74,6 @@
                 "codeception/module-asserts": "^1.0.0",
                 "codeception/module-phpbrowser": "^1.0.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -95,27 +93,26 @@
             "description": "PHP Container",
             "support": {
                 "issues": "https://github.com/eghojansu/php-container/issues",
-                "source": "https://github.com/eghojansu/php-container/tree/master"
+                "source": "https://github.com/eghojansu/php-container/tree/v0.1.0"
             },
-            "time": "2022-03-11T15:49:26+00:00"
+            "time": "2022-03-27T07:57:35+00:00"
         },
         {
             "name": "ekok/php-event-dispatcher",
-            "version": "dev-master",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-event-dispatcher.git",
-                "reference": "f1d52394dfc770107d184fe2ea39385508ce3b0d"
+                "reference": "42ad0fd934235f757ebdc9e7dd0b034def7a1b64"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-event-dispatcher/zipball/f1d52394dfc770107d184fe2ea39385508ce3b0d",
-                "reference": "f1d52394dfc770107d184fe2ea39385508ce3b0d",
+                "url": "https://api.github.com/repos/eghojansu/php-event-dispatcher/zipball/42ad0fd934235f757ebdc9e7dd0b034def7a1b64",
+                "reference": "42ad0fd934235f757ebdc9e7dd0b034def7a1b64",
                 "shasum": ""
             },
             "require": {
-                "ekok/php-container": "dev-master",
-                "ekok/php-utils": "dev-master",
+                "ekok/php-container": "^0",
                 "php": ">=8.0"
             },
             "require-dev": {
@@ -123,7 +120,6 @@
                 "codeception/module-asserts": "^1.0.0",
                 "codeception/module-phpbrowser": "^1.0.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -143,22 +139,22 @@
             "description": "PHP Event Dispatcher",
             "support": {
                 "issues": "https://github.com/eghojansu/php-event-dispatcher/issues",
-                "source": "https://github.com/eghojansu/php-event-dispatcher/tree/master"
+                "source": "https://github.com/eghojansu/php-event-dispatcher/tree/v0.1.0"
             },
-            "time": "2022-03-17T12:30:39+00:00"
+            "time": "2022-03-27T08:01:17+00:00"
         },
         {
             "name": "ekok/php-logger",
-            "version": "dev-master",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-logger.git",
-                "reference": "aadb32c27588ab5f71be3d24271826519d22835d"
+                "reference": "cfb3a3dcc8d520a12e442ea9ad6fa3b3147c2cf4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/aadb32c27588ab5f71be3d24271826519d22835d",
-                "reference": "aadb32c27588ab5f71be3d24271826519d22835d",
+                "url": "https://api.github.com/repos/eghojansu/php-logger/zipball/cfb3a3dcc8d520a12e442ea9ad6fa3b3147c2cf4",
+                "reference": "cfb3a3dcc8d520a12e442ea9ad6fa3b3147c2cf4",
                 "shasum": ""
             },
             "require": {
@@ -169,7 +165,6 @@
                 "codeception/module-asserts": "^1.0.0",
                 "codeception/module-phpbrowser": "^1.0.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -189,22 +184,22 @@
             "description": "PHP Logger",
             "support": {
                 "issues": "https://github.com/eghojansu/php-logger/issues",
-                "source": "https://github.com/eghojansu/php-logger/tree/master"
+                "source": "https://github.com/eghojansu/php-logger/tree/v0.1.0"
             },
-            "time": "2022-03-19T14:24:28+00:00"
+            "time": "2022-03-27T08:06:40+00:00"
         },
         {
             "name": "ekok/php-utils",
-            "version": "dev-master",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "0efea9fae3ae766849d33e4b77b40f1eb0ccdacb"
+                "reference": "aecbbdcb51e804f26d5f3fdd6aae598c9d82b7a5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/0efea9fae3ae766849d33e4b77b40f1eb0ccdacb",
-                "reference": "0efea9fae3ae766849d33e4b77b40f1eb0ccdacb",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/aecbbdcb51e804f26d5f3fdd6aae598c9d82b7a5",
+                "reference": "aecbbdcb51e804f26d5f3fdd6aae598c9d82b7a5",
                 "shasum": ""
             },
             "require": {
@@ -215,7 +210,6 @@
                 "codeception/module-asserts": "^1.0.0",
                 "codeception/module-phpbrowser": "^1.0.0"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -235,9 +229,9 @@
             "description": "PHP Utilities",
             "support": {
                 "issues": "https://github.com/eghojansu/php-utils/issues",
-                "source": "https://github.com/eghojansu/php-utils/tree/master"
+                "source": "https://github.com/eghojansu/php-utils/tree/v0.1.0"
             },
-            "time": "2022-03-23T02:44:36+00:00"
+            "time": "2022-03-27T07:47:25+00:00"
         }
     ],
     "packages-dev": [
@@ -4709,13 +4703,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "ekok/php-utils": 20,
-        "ekok/php-container": 20,
-        "ekok/php-event-dispatcher": 20,
-        "ekok/php-cache": 20,
-        "ekok/php-logger": 20
-    },
+    "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {

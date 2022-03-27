@@ -3,7 +3,6 @@
     "description": "PHP Application Framework",
     "type": "library",
     "license": "MIT",
-    "minimum-stability": "stable",
     "authors": [
         {
             "name": "Eko Kurniawan",
@@ -20,11 +19,11 @@
     },
     "require": {
         "php": ">=8.0",
-        "ekok/php-utils": "dev-master",
-        "ekok/php-container": "dev-master",
-        "ekok/php-event-dispatcher": "dev-master",
-        "ekok/php-cache": "dev-master",
-        "ekok/php-logger": "dev-master"
+        "ekok/php-utils": "^0",
+        "ekok/php-container": "^0",
+        "ekok/php-event-dispatcher": "^0",
+        "ekok/php-cache": "^0",
+        "ekok/php-logger": "^0"
     },
     "require-dev": {
         "codeception/codeception": "~4.1",
