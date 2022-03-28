@@ -348,6 +348,13 @@ class EnvTest extends \Codeception\Test\Unit
             return $env->send('line 2');
         });
         $env->route('GET /limited [kbps=100]', static fn() => 'it is actually limited by 100 kbps');
+        $env->route('GET /rich-tags [foo,bar,param=foo;bar,param2=foo,param2=bar]', static function (Env $env) {
+            return (
+                'tags=' . implode(',', $env->getMatch('tags'))
+                . '|param=' . implode(',', $env->getMatch('param'))
+                . '|param2=' . implode(',', $env->getMatch('param2'))
+            );
+        });
         $env->run();
 
         $this->assertSame($expected, $env->getOutput());
@@ -415,6 +422,11 @@ class EnvTest extends \Codeception\Test\Unit
                 'quiet' => false,
                 'SERVER' => array(
                     'REQUEST_URI' => '/limited',
+                ),
+            )),
+            'tag function' => array('tags=foo,bar|param=foo,bar|param2=foo,bar', array(
+                'SERVER' => array(
+                    'REQUEST_URI' => '/rich-tags',
                 ),
             )),
         );

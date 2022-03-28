@@ -18,7 +18,7 @@ class Env
     const VAR_GLOBALS = 'GET|POST|COOKIE|FILES|SERVER|ENV';
     const ROUTE_VERBS = 'GET|POST|PUT|DELETE|HEAD|OPTIONS';
     const ROUTE_PARAMS = '/(?:\/?@(\w+)(?:(?::([^\/?]+)|(\*)))?(\?)?)/';
-    const ROUTE_PATTERN = '/^\s*([\w|]+)(?:\s*@([^\s]+))?(?:\s*(\/[^\s]*))?(?:\s*\[([\w|,=]+)\])?\s*$/';
+    const ROUTE_PATTERN = '/^\s*([\w|]+)(?:\s*@([^\s]+))?(?:\s*(\/[^\s]*))?(?:\s*\[([^\]]+)\])?\s*$/';
 
     private $routes = array();
     private $aliases = array();
@@ -1745,6 +1745,14 @@ class Env
 
                 if ('' === $value) {
                     $set['tags'][] = $tag;
+                } elseif (false !== strpos($value, ';')) {
+                    $set[$tag] = array_filter(explode(';', $value), 'trim');
+                } elseif (isset($set[$tag])) {
+                    if (!is_array($set[$tag])) {
+                        $set[$tag] = (array) $set[$tag];
+                    }
+
+                    $set[$tag][] = $value;
                 } else {
                     $set[$tag] = $value;
                 }
