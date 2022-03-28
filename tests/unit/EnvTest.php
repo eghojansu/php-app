@@ -7,6 +7,7 @@ use Ekok\Container\Di;
 use Ekok\App\Event\Error as ErrorEvent;
 use Ekok\App\Event\Redirect as RedirectEvent;
 use Ekok\App\Event\Request as RequestEvent;
+use Ekok\App\Event\RouteMatch as RouteMatchEvent;
 use Ekok\App\Redirection;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event;
@@ -461,7 +462,7 @@ class EnvTest extends \Codeception\Test\Unit
     public function testRunInteruption()
     {
         $this->env->listen(RequestEvent::class, static function (RequestEvent $event) {
-            $event->setOutput('foo')->setKbps(0)->stopPropagation();
+            $event->setOutput('foo')->setKbps(0);
         });
         $this->env->run();
 
@@ -998,11 +999,33 @@ class EnvTest extends \Codeception\Test\Unit
         $actual = $this->env->getOutput();
 
         $this->assertSame($expected, $actual);
+        $this->assertArrayNotHasKey('Location', $this->env->getHeaders());
+    }
+
+    public function testRedirect()
+    {
+        $this->env->listen(RedirectEvent::class, static function (RedirectEvent $event) {
+            $event->setUrl('updated');
+        });
+        $this->env->redirect('/');
+
+        $this->assertNull($this->env->getOutput());
+        $this->assertSame('updated', $this->env->getHeader('Location')[0]);
+    }
+
+    public function testRedirectIntercepted()
+    {
+        $this->env->listen(RedirectEvent::class, static function (Env $env) {
+            $env->send('foo');
+        });
+        $this->env->redirect('/');
+
+        $this->assertSame('foo', $this->env->getOutput());
     }
 
     public function testEventByName()
     {
-        $this->env->listen('onRequest', static fn(RequestEvent $event) => $event->stopPropagation()->setOutput('foo'));
+        $this->env->listen('onRequest', static fn(RequestEvent $event) => $event->setOutput('foo'));
         $this->env->run();
 
         $this->assertSame('foo', $this->env->getOutput());
@@ -1189,10 +1212,7 @@ class EnvTest extends \Codeception\Test\Unit
     public function testEventOrder()
     {
         $handle = static fn($name) => static function(RequestEvent $event) use ($name) {
-            $output = $event->getOutput();
-            $output[] = $name;
-
-            $event->setOutput($output);
+            $event->data[] = $name;
         };
 
         $this->env->listen('onRequest', $handle('a'));
@@ -1203,7 +1223,7 @@ class EnvTest extends \Codeception\Test\Unit
 
         $this->env->dispatch($event = new RequestEvent());
 
-        $actual = $event->getOutput();
+        $actual = $event->data;
         $expected = array('d', 'a', 'b', 'c', 'e');
 
         $this->assertSame($expected, $actual);
@@ -1293,5 +1313,60 @@ class EnvTest extends \Codeception\Test\Unit
         $env->run();
 
         $this->assertSame('[CLI] [403 - Forbidden] GET /', $env->getOutput());
+    }
+
+    public function testRouteInterception()
+    {
+        $this->env->route('GET / [rich=tags,kbps=100,foo]', 'foo');
+        $this->env->listen('onRouteMatch', static function (RouteMatchEvent $match) {
+            $match->setKbps($match->getKbps() - 1);
+            $match->setTags(array_merge($match->getTags(), array('bar')));
+            $match->setAttribute('custom', 'foo');
+
+            $args = array(
+                'separator' => ' ',
+                'array' => array(
+                    'calling',
+                    $match->getController(),
+                    'with',
+                    count($match->getArguments()),
+                    'argument',
+                    'at',
+                    $match->getKbps(),
+                    'kbps',
+                    'and tagged by',
+                    implode(', ', $match->getTags()),
+                    'and custom tag',
+                    $match->getAttribute('custom'),
+                    'so this is very rich',
+                    $match->getAttribute('rich'),
+                    'total key in match',
+                    count($match->getMatch()),
+                ),
+            );
+
+            $match->setController('implode');
+            $match->setArguments($args);
+        });
+        $this->env->run();
+
+        $expected = 'calling foo with 0 argument at 99 kbps and tagged by foo, bar and custom tag foo so this is very rich tags total key in match 7';
+        $actual = $this->env->getOutput();
+
+        $this->assertSame($expected, $actual);
+    }
+
+    public function testRouteTotalInterception()
+    {
+        $this->env->route('GET /', 'foo');
+        $this->env->listen('onRouteMatch', static function (RouteMatchEvent $match) {
+            $match->setOutput('always me being returned');
+        });
+        $this->env->run();
+
+        $expected = 'always me being returned';
+        $actual = $this->env->getOutput();
+
+        $this->assertSame($expected, $actual);
     }
 }

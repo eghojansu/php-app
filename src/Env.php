@@ -577,7 +577,9 @@ class Env
             $this->addHeader('Location', $event->getUrl());
         }
 
-        $this->doResponse($event);
+        if (!$this->runInterception($event)) {
+            $this->doResponse($event);
+        }
 
         return $this;
     }
@@ -1769,9 +1771,7 @@ class Env
 
         $this->dispatch($event = new Event\Request());
 
-        if ($event->isPropagationStopped() || $this->sent()) {
-            $this->sent() || $this->doResponse($event);
-
+        if ($this->runInterception($event)) {
             return;
         }
 
@@ -1789,19 +1789,22 @@ class Env
 
         $result = null;
         $output = null;
+        $kbps = 0;
 
         if ($match && !$this->isPreflight()) {
             $this->data['match'] = $match;
 
-            $this->dispatch($event = new Event\Controller($match['handler'] ?? null));
+            $this->dispatch($event = new Event\RouteMatch($match));
 
-            $handler = $event->getController();
+            if ($this->runInterception($event)) {
+                return;
+            }
 
-            $this->dispatch($event = new Event\ControllerArguments($handler, $match['args'] ?? array()));
-
-            $arguments = $event->getArguments();
-
-            list($result, $output) = $this->runHandle($handler, $arguments);
+            $kbps = $event->getKbps();
+            list($result, $output) = $this->runHandle(
+                $event->getController(),
+                $event->getArguments(),
+            );
         }
 
         if ($this->isVerb('OPTIONS')) {
@@ -1810,7 +1813,7 @@ class Env
         }
 
         $this->setHeaders($this->postCors(array_keys($routes)));
-        $this->doResponse($result, $output, null, $match['kbps'] ?? 0);
+        $this->doResponse($result, $output, null, $kbps);
     }
 
     private function runHandle(string|callable $handler, array|null $args): array
@@ -1821,6 +1824,21 @@ class Env
         $output = $this->stopBuffering();
 
         return array($result, $output[0] ?? null);
+    }
+
+    private function runInterception(BaseEvent $event): bool
+    {
+        if ($this->sent()) {
+            return true;
+        }
+
+        if ($event->isPropagationStopped()) {
+            $this->doResponse($event);
+
+            return true;
+        }
+
+        return false;
     }
 
     private function doResponse($result, string $output = null, \Closure $getOutput = null, string|int $kbps = null): void

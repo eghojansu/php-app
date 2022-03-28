@@ -11,6 +11,9 @@ class Request extends Event
     /** @var int */
     private $code;
 
+    /** @var string */
+    private $text;
+
     /** @var int */
     private $kbps;
 
@@ -25,27 +28,26 @@ class Request extends Event
 
     public function __construct($output = null, int $code = null, array $headers = null)
     {
-        $this->setCode($code ?? 200);
-        $this->setOutput($output);
+        $this->setCode($code);
+        $this->setOutput($output, false);
         $this->setHeaders($headers);
     }
 
     public function getCode(): int
     {
-        return $this->code;
+        return $this->code ?? 200;
     }
 
-    public function setCode(int $code): static
+    public function setCode(int|null $code): static
     {
         $this->code = $code;
-        $this->text = Http::statusText($code);
 
         return $this;
     }
 
     public function getText(): string
     {
-        return $this->text;
+        return $this->text ?? ($this->text = Http::statusText($this->getCode()));
     }
 
     public function getOutput()
@@ -53,9 +55,13 @@ class Request extends Event
         return $this->output;
     }
 
-    public function setOutput($output): static
+    public function setOutput($output, bool $stopPropagation = true): static
     {
         $this->output = $output;
+
+        if ($stopPropagation) {
+            $this->stopPropagation();
+        }
 
         return $this;
     }
