@@ -385,12 +385,12 @@ class EnvTest extends \Codeception\Test\Unit
                     'REQUEST_URI' => '/result',
                 ),
             )),
-            'not found' => array('[CLI] [404 - Not Found] GET /eat', array(
+            'not found' => array('[CLI] localhost [404 - Not Found] GET /eat', array(
                 'SERVER' => array(
                     'REQUEST_URI' => '/eat',
                 ),
             )),
-            'not found html' => array('[HTML] [404 - Not Found] GET /eat', array(
+            'not found html' => array('[HTML] localhost [404 - Not Found] GET /eat', array(
                 'debug' => true,
                 'cli' => false,
                 'SERVER' => array(
@@ -409,7 +409,7 @@ class EnvTest extends \Codeception\Test\Unit
                     'REQUEST_METHOD' => 'POST',
                 ),
             )),
-            'not found by verb' => array('[CLI] [404 - Not Found] GET /drink', array(
+            'not found by verb' => array('[CLI] localhost [404 - Not Found] GET /drink', array(
                 'SERVER' => array(
                     'REQUEST_URI' => '/drink',
                 ),
@@ -642,7 +642,7 @@ class EnvTest extends \Codeception\Test\Unit
         $env->error();
 
         $this->assertFileExists($file);
-        $this->assertStringContainsString('[info] [500 - Internal Server Error] GET /', file_get_contents($file));
+        $this->assertStringContainsString('[info] localhost [500 - Internal Server Error] GET /', file_get_contents($file));
     }
 
     public function testBody()
@@ -1312,7 +1312,7 @@ class EnvTest extends \Codeception\Test\Unit
         $env->setErrorTemplate('cli', '[CLI] {message}');
         $env->run();
 
-        $this->assertSame('[CLI] [403 - Forbidden] GET /', $env->getOutput());
+        $this->assertSame('[CLI] 188.163.68.29 [403 - Forbidden] GET /', $env->getOutput());
     }
 
     public function testRouteInterception()

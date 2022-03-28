@@ -483,7 +483,8 @@ class Env
 
         if (null === $event->getMessage()) {
             $event->setMessage(sprintf(
-                '[%s - %s] %s %s',
+                '%s [%s - %s] %s %s',
+                $this->getClientIp() ?? 'localhost',
                 $event->getCode(),
                 $event->getText(),
                 $this->getVerb(),
