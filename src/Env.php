@@ -319,9 +319,19 @@ class Env
         return $this;
     }
 
-    public function getCors(): array|null
+    public function isPreflight(): bool
     {
-        return $this->data['cors'] ?? null;
+        return isset($this->data['SERVER']['HTTP_ACCESS_CONTROL_REQUEST_METHOD']);
+    }
+
+    public function isCors(): bool
+    {
+        return isset($this->data['SERVER']['HTTP_ORIGIN']) && $this->getCors('origin');
+    }
+
+    public function getCors(string $key = null): array|string|bool|null
+    {
+        return $key ? ($this->data['cors'][$key] ?? null) : ($this->data['cors'] ?? null);
     }
 
     public function setCors(array $cors): static
@@ -1675,7 +1685,7 @@ class Env
     {
         $this->dispatch($event = new Event\Request());
 
-        if ($event->isPropagationStopped()) {
+        if ($event->isPropagationStopped() || $this->sent()) {
             $this->sent() || $this->doResponse($event);
 
             return;
@@ -1687,7 +1697,7 @@ class Env
 
         $match = $this->routeMatch(null, null, $routes);
 
-        $this->setHeaders($this->preCors($cors, $preflight));
+        $this->setHeaders($this->preCors());
 
         if (!$routes || (!$match && !$this->isVerb('OPTIONS'))) {
             throw Http::errorNotFound();
@@ -1696,7 +1706,7 @@ class Env
         $result = null;
         $output = null;
 
-        if ($match) {
+        if ($match && !$this->isPreflight()) {
             $this->data['match'] = $match;
 
             $this->dispatch($event = new Event\Controller($match['handler'] ?? null));
@@ -1715,7 +1725,7 @@ class Env
             $output = null;
         }
 
-        $this->setHeaders($this->postCors(array_keys($routes), $cors));
+        $this->setHeaders($this->postCors(array_keys($routes)));
         $this->doResponse($result, $output, null, $match['kbps'] ?? 0);
     }
 
@@ -1762,27 +1772,17 @@ class Env
         }
     }
 
-    private function preCors(bool &$cors = null, bool &$preflight = null): array
+    private function preCors(): array
     {
-        $setup = $this->getCors();
-        $cors = false;
-        $preflight = false;
-        $origin = $this->data['SERVER']['HTTP_ORIGIN'] ?? null;
-        $headers = array();
-
-		if ($origin && ($allowOrigin = $setup['origin'] ?? null)) {
-            $cors = true;
-			$preflight = isset($this->data['SERVER']['HTTP_ACCESS_CONTROL_REQUEST_METHOD']);
-
-            $headers['Access-Control-Allow-Origin'] = true === $allowOrigin ? $origin : $allowOrigin;
-            $headers['Access-Control-Allow-Credentials'] = var_export($setup['credentials'] ?? false, true);
-		}
-
-        return $headers;
+        return $this->isCors() ? array(
+            'Access-Control-Allow-Origin' => (true === ($allow = $this->getCors('origin'))) ? $this->data['SERVER']['HTTP_ORIGIN'] : $allow,
+            'Access-Control-Allow-Credentials' => var_export($this->getCors('credentials') ?? false, true),
+        ) : array();
     }
 
-    private function postCors(array $verbs, bool $cors): array
+    private function postCors(array $verbs): array
     {
+        $cors = $this->isCors();
         $setup = $this->getCors();
         $allowed = implode(',', $verbs);
         $headers = array();
