@@ -350,6 +350,80 @@ class Env
         return $this;
     }
 
+    public function getExempt(): array|null
+    {
+        return $this->data['exempt'] ?? null;
+    }
+
+    public function addExempt(string $ip): static
+    {
+        $this->data['exempt'][] = $ip;
+
+        return $this;
+    }
+
+    public function setExempt(array $ips): static
+    {
+        $this->data['exempt'] = array();
+
+        array_walk($ips, fn (string $ip) => $this->addExempt($ip));
+
+        return $this;
+    }
+
+    public function isWhitelisted(string $ip): bool
+    {
+        if (!($exempt = $this->getExempt()) || ($found = in_array($ip, $exempt))) {
+            return $found ?? false;
+        }
+
+        $parts = explode('.', $ip);
+        $expected = array_fill(0, count($parts), true);
+
+        return Arr::some($exempt, static fn (string $str) => $expected === array_map(
+            static fn ($a, $b) => !$b || '*' === $b || $a == $b,
+            $parts,
+            explode('.', $str),
+        ));
+    }
+
+    public function getDnsbl(): array|null
+    {
+        return $this->data['dnsbl'] ?? null;
+    }
+
+    public function addDnsbl(string $host): static
+    {
+        if ($add = filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_NULL_ON_FAILURE) ?? filter_var($host, FILTER_VALIDATE_IP, FILTER_NULL_ON_FAILURE|FILTER_FLAG_IPV4)) {
+            $this->data['dnsbl'][] = $add;
+        }
+
+        return $this;
+    }
+
+    public function setDnsbl(array $hosts): static
+    {
+        $this->data['dnsbl'] = array();
+
+        array_walk($hosts, fn (string $host) => $this->addDnsbl($host));
+
+        return $this;
+    }
+
+    public function isBlacklisted(string $ip): bool
+    {
+        if ($this->isWhitelisted($ip) || !($dnsbl = $this->getDnsbl())) {
+            return false;
+        }
+
+        $ipr = implode('.', array_reverse(explode('.', $ip)));
+
+        return Arr::some(
+            $dnsbl,
+            static fn(string $host) => checkdnsrr($ipr . '.' . $host, 'A'),
+        );
+    }
+
     public function isBuiltin(): bool
     {
         return $this->data['builtin'] ?? ($this->data['builtin'] = 'cli-server' === PHP_SAPI);
@@ -1683,6 +1757,8 @@ class Env
 
     private function runInternal(): void
     {
+        $this->spamChecks();
+
         $this->dispatch($event = new Event\Request());
 
         if ($event->isPropagationStopped() || $this->sent()) {
@@ -1769,6 +1845,16 @@ class Env
                 $event->getMime(),
                 $event->getKbps(),
             );
+        }
+    }
+
+    private function spamChecks(): void
+    {
+        if (
+            ($ip = $this->getClientIp())
+            && $this->isBlacklisted($ip)
+        ) {
+            throw Http::errorForbidden();
         }
     }
 

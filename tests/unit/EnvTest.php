@@ -1228,4 +1228,58 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('Allow-Foo', $headers['Access-Control-Allow-Headers'][0]);
         $this->assertSame('600', $headers['Access-Control-Max-Age'][0]);
     }
+
+    public function testWhitelist()
+    {
+        $this->assertFalse($this->env->isWhitelisted('127.0.0.1'));
+
+        $this->env->setExempt(array(
+            '127.0.0.1',
+            '192.168.*',
+            '100.*.1.1',
+        ));
+
+        $this->assertTrue($this->env->isWhitelisted('127.0.0.1'));
+        $this->assertTrue($this->env->isWhitelisted('192.168.20.1'));
+        $this->assertFalse($this->env->isWhitelisted('192.169.20.1'));
+        $this->assertTrue($this->env->isWhitelisted('100.100.1.1'));
+        $this->assertFalse($this->env->isWhitelisted('100.100.1.2'));
+    }
+
+    public function testBlacklist()
+    {
+        $this->assertFalse($this->env->isBlacklisted('127.0.0.1'));
+
+        $this->env->setExempt(array(
+            '127.0.0.1',
+            '192.168.*',
+            '100.*.1.1',
+        ));
+        $this->env->setDnsbl(array(
+            'dnsbl.spfbl.net',
+        ));
+
+        $this->assertFalse($this->env->isBlacklisted('127.0.0.1'));
+        $this->assertFalse($this->env->isBlacklisted('192.168.20.1'));
+        $this->assertTrue($this->env->isBlacklisted('192.169.20.1'));
+        $this->assertFalse($this->env->isBlacklisted('100.100.1.1'));
+        $this->assertTrue($this->env->isBlacklisted('100.100.1.2'));
+        $this->assertTrue($this->env->isBlacklisted('188.163.68.29'));
+    }
+
+    public function testSpamCheck()
+    {
+        $env = self::createEnv(array(
+            'SERVER' => array(
+                'REMOTE_ADDR' => '188.163.68.29',
+            ),
+        ));
+        $env->setDnsbl(array(
+            'dnsbl.spfbl.net',
+        ));
+        $env->setErrorTemplate('cli', '[CLI] {message}');
+        $env->run();
+
+        $this->assertSame('[CLI] [403 - Forbidden] GET /', $env->getOutput());
+    }
 }
