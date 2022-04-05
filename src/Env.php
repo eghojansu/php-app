@@ -574,7 +574,7 @@ class Env
         return $this->redirect($this->getPreviousUrl($fallbackUrl ?? $this->url('/')), null, 303);
     }
 
-    public function routeLoads(string ...$directories): static
+    public function routeLoad(string ...$directories): static
     {
         $router = $this->getRouter();
 
@@ -964,8 +964,9 @@ class Env
 
     public function getMimeFile(string $file): string
     {
+        $mimes = $this->getMimeList();
         $ext = ltrim(strrchr('.' . $file, '.'), '.');
-        $list = $this->data['mime_list'][$ext] ?? $this->data['mime_list'][strtolower($ext)] ?? 'application/octet-stream';
+        $list = $mimes[$ext] ?? $mimes[strtolower($ext)] ?? 'application/octet-stream';
 
         return is_array($list) ? reset($list) : $list;
     }
@@ -1424,7 +1425,7 @@ class Env
         $this->setHeaders(array(
             'Content-Length' => sprintf('%u', $length),
             'Cache-Control' => 'public, max-age=604800',
-            'Expires' => gmdate("D, d M Y H:i:s", time() + 604800) . " GMT",
+            'Expires' => Http::stamp(time() + 604800),
         ));
         $this->setHeaders($headers ?? array());
         $this->send(status: $status, mime: $mime ?? $this->getMimeFile($file));

@@ -1374,7 +1374,7 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testLoadRoute()
     {
-        $this->env->routeLoads(TEST_DATA . '/classes/Controller');
+        $this->env->routeLoad(TEST_DATA . '/classes/Controller');
         $this->env->run();
 
         $this->assertSame('Welcome home', $this->env->getOutput());
