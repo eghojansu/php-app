@@ -23,7 +23,8 @@
         "ekok/php-container": "^0",
         "ekok/php-event-dispatcher": "^0",
         "ekok/php-cache": "^0",
-        "ekok/php-logger": "^0"
+        "ekok/php-logger": "^0",
+        "ekok/php-router": "^0.1.2"
     },
     "require-dev": {
         "codeception/codeception": "~4.1",

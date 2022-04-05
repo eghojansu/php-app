@@ -12,6 +12,7 @@ use Ekok\App\Redirection;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event;
 use Ekok\EventDispatcher\EventSubscriberInterface;
+use Ekok\Router\Router;
 
 class EnvTest extends \Codeception\Test\Unit
 {
@@ -40,6 +41,8 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame($this->env->getDispatcher(), $this->env->getContainer()->make('dispatcher'));
         $this->assertSame($this->env->getCache(), $this->env->getContainer()->make(Cache::class));
         $this->assertSame($this->env->getCache(), $this->env->getContainer()->make('cache'));
+        $this->assertSame($this->env->getRouter(), $this->env->getContainer()->make(Router::class));
+        $this->assertSame($this->env->getRouter(), $this->env->getContainer()->make('router'));
         $this->assertSame($this->env->getLog(), $this->env->getContainer()->make(Log::class));
         $this->assertSame($this->env->getLog(), $this->env->getContainer()->make('log'));
         $this->assertSame($this->env, $this->env->getContainer()->make(Env::class));
@@ -89,7 +92,6 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame(null, $this->env->getProjectDir());
         $this->assertSame('3lxu8sqeg7sw8', $this->env->getSeed());
         $this->assertSame('lang', $this->env->getLanguageKey());
-        $this->assertCount(0, $this->env->getRoutes());
 
         // mutate
         $this->assertSame('POST', $this->env->setVerb('post')->getVerb());
@@ -336,9 +338,9 @@ class EnvTest extends \Codeception\Test\Unit
         $env->route('GET /is-debug', static fn(Env $env) => array('debug' => $env->isDebug()));
         $env->route('GET /foo/@bar/@baz', static fn($bar, $baz) => array($bar, $baz));
         $env->route('POST /drink/@any*?', static fn($any = 'not thristy') => $any);
-        $env->route('GET @eater /eat/@foods* [name=eater,eat,drinks]', static function(Env $env, $foods) {
+        $env->route('GET @eater /eat/@foods* [name=eater,eat,drinks]', static function(Env $env, Router $router, $foods) {
             $match = $env->getMatch();
-            $aliases = $env->getAliases();
+            $aliases = $router->getAliases();
 
             return isset($aliases['eater']) ? $foods . '-' . $match['name'] . '-' . implode(':', $match['tags']) : null;
         });
@@ -438,7 +440,7 @@ class EnvTest extends \Codeception\Test\Unit
         $this->env->setErrorTemplate('cli', '[CLI] [{code} - {text}] {message}');
         $this->env->run();
 
-        $this->assertSame('[CLI] [500 - Internal Server Error] No route defined', $this->env->getOutput());
+        $this->assertSame('[CLI] [404 - Not Found] localhost [404 - Not Found] GET /', $this->env->getOutput());
     }
 
     public function testRunErrorJson()
@@ -1368,5 +1370,13 @@ class EnvTest extends \Codeception\Test\Unit
         $actual = $this->env->getOutput();
 
         $this->assertSame($expected, $actual);
+    }
+
+    public function testLoadRoute()
+    {
+        $this->env->routeLoads(TEST_DATA . '/classes/Controller');
+        $this->env->run();
+
+        $this->assertSame('Welcome home', $this->env->getOutput());
     }
 }

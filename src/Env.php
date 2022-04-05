@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Ekok\App;
 
 use Ekok\Utils\Arr;
-use Ekok\Utils\File;
 use Ekok\Utils\Str;
 use Ekok\Logger\Log;
+use Ekok\Utils\File;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
+use Ekok\Router\Router;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event as BaseEvent;
 
@@ -19,9 +20,6 @@ class Env
     const ROUTE_VERBS = 'GET|POST|PUT|DELETE|HEAD|OPTIONS';
     const ROUTE_PARAMS = '/(?:\/?@(\w+)(?:(?::([^\/?]+)|(\*)))?(\?)?)/';
     const ROUTE_PATTERN = '/^\s*([\w|]+)(?:\s*@([^\s]+))?(?:\s*(\/[^\s]*))?(?:\s*\[([^\]]+)\])?\s*$/';
-
-    private $routes = array();
-    private $aliases = array();
 
     public static function create(string $name = null, array $data = null, array $rules = null)
     {
@@ -34,6 +32,7 @@ class Env
                     array(
                         'log' => $rule + array('class' => Log::class),
                         'cache' => $rule + array('class' => Cache::class),
+                        'router' => $rule + array('class' => Router::class),
                         'dispatcher' => $rule + array('class' => Dispatcher::class),
                     ),
                     $rules ?? array(),
@@ -83,6 +82,11 @@ class Env
     public function getCache(): Cache
     {
         return $this->make(Cache::class);
+    }
+
+    public function getRouter(): Router
+    {
+        return $this->make(Router::class);
     }
 
     public function getDispatcher(): Dispatcher
@@ -503,37 +507,9 @@ class Env
         return $this;
     }
 
-    public function alias(string $alias, array $args = null): string
+    public function alias(string $alias, array|string $args = null): string
     {
-        $path = $this->aliases[$alias] ?? ('/' . ltrim($alias, '/'));
-        $params = $args ?? array();
-
-        if (false !== strpos($path, '@')) {
-            $path = preg_replace_callback(
-                self::ROUTE_PARAMS,
-                static function ($match) use ($alias, &$params) {
-                    $param = $params[$match[1]] ?? null;
-
-                    if (!$param && !$match[4]) {
-                        throw new \LogicException(sprintf('Route param required: %s@%s', $match[1], $alias));
-                    }
-
-                    if ($param) {
-                        unset($params[$match[1]]);
-                    }
-
-                    return $param ? '/' . urldecode($param) : null;
-                },
-                $path,
-                flags: PREG_UNMATCHED_AS_NULL,
-            );
-        }
-
-        if ($params) {
-            $path .= '?' . http_build_query($params);
-        }
-
-        return $path;
+        return $this->getRouter()->alias($alias, $args);
     }
 
     public function createUrl(string $path, array $args = null, bool $absolute = false, bool $entry = true): string
@@ -563,11 +539,6 @@ class Env
     public function getMatch(string $key = null, array|string|callable|null $default = null): array|string|callable|null
     {
         return $key ? ($this->data['match'][$key] ?? $default) : ($this->data['match'] ?? null);
-    }
-
-    public function getAliases(): array
-    {
-        return $this->aliases;
     }
 
     public function redirect(string $url, bool $permanent = null, int $code = null): static
@@ -603,9 +574,13 @@ class Env
         return $this->redirect($this->getPreviousUrl($fallbackUrl ?? $this->url('/')), null, 303);
     }
 
-    public function getRoutes(): array
+    public function routeLoads(string ...$directories): static
     {
-        return $this->routes;
+        $router = $this->getRouter();
+
+        array_walk($directories, static fn(string $directory) => $router->load($directory));
+
+        return $this;
     }
 
     public function routeAll(array $routes): static
@@ -617,29 +592,7 @@ class Env
 
     public function route(string $route, callable|string|null $handler = null): static
     {
-        $found = preg_match(self::ROUTE_PATTERN, $route, $matches, PREG_UNMATCHED_AS_NULL);
-
-        if (!$found) {
-            throw new \LogicException(sprintf('Invalid route: "%s"', $route));
-        }
-
-        $pattern = $matches[3] ?? $this->aliases[$matches[2]] ?? null;
-
-        if (!$pattern) {
-            throw new \LogicException(
-                $matches[2] ? sprintf('Route not exists: %s', $matches[2]) : sprintf('No path defined in route: "%s"', $route),
-            );
-        }
-
-        $set = array('handler' => $handler, 'alias' => $matches[2]) + $this->routeSet($matches[4]);
-
-        if ($set['alias']) {
-            $this->aliases[$set['alias']] = $pattern;
-        }
-
-        foreach (explode('|', strtoupper($matches[1])) as $verb) {
-            $this->routes[$pattern][$verb] = $set;
-        }
+        $this->getRouter()->route($route, $handler);
 
         return $this;
     }
@@ -654,18 +607,6 @@ class Env
     public function reroute(string $route, string $url, bool $permanent = true): static
     {
         return $this->route($route, fn () => $this->redirect($url, $permanent));
-    }
-
-    public function routeMatch(string $path = null, string $method = null, array &$founds = null): array|null
-    {
-        $wPath = $path ?? $this->getPath();
-        $wVerb = $method ?? $this->getVerb();
-
-        $args = null;
-        $founds = $this->routes[$wPath] ?? $this->routeFind($wPath, $args);
-        $handler = $founds[$wVerb] ?? $founds[strtoupper($wVerb)] ?? null;
-
-        return $handler ? $handler + compact('args') : null;
     }
 
     public function getContentType(): string
@@ -1699,73 +1640,6 @@ class Env
         };
     }
 
-    private function routeFind(string $path, array &$args = null): array|null
-    {
-        return Arr::first(
-            $this->routes,
-            function (array $routes, string $pattern) use ($path, &$args) {
-                return $this->routeMatchPattern($pattern, $path, $args) ? $routes : null;
-            },
-        );
-    }
-
-    private function routeMatchPattern(string $pattern, string $path, array &$args = null): bool
-    {
-        $match = !!preg_match($this->routeRegExp($pattern), $path, $matches);
-        $args = array_filter(array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY));
-
-        return $match;
-    }
-
-    private function routeRegExp(string $pattern): string
-    {
-        return (
-            '#^' .
-            preg_replace_callback(
-                self::ROUTE_PARAMS,
-                static fn (array $match) => (
-                    '/' .
-                    $match[4] .
-                    '(?<' .
-                        $match[1] .
-                        '>' .
-                        ($match[3] ? '.*' : ($match[2] ?? '[\w-]+')) .
-                    ')'
-                ),
-                $pattern,
-                flags: PREG_UNMATCHED_AS_NULL,
-            ) .
-            '/?$#'
-        );
-    }
-
-    private function routeSet(string|null $str): array
-    {
-        return Arr::reduce(
-            $str ? array_filter(explode(',', $str), 'trim') : array(),
-            static function (array $set, string $line) {
-                list($tag, $value) = array_map('trim', explode('=', $line . '='));
-
-                if ('' === $value) {
-                    $set['tags'][] = $tag;
-                } elseif (false !== strpos($value, ';')) {
-                    $set[$tag] = array_filter(explode(';', $value), 'trim');
-                } elseif (isset($set[$tag])) {
-                    if (!is_array($set[$tag])) {
-                        $set[$tag] = (array) $set[$tag];
-                    }
-
-                    $set[$tag][] = $value;
-                } else {
-                    $set[$tag] = $value;
-                }
-
-                return $set;
-            },
-            array(),
-        );
-    }
-
     private function runInternal(): void
     {
         $this->spamChecks();
@@ -1776,11 +1650,7 @@ class Env
             return;
         }
 
-        if (!$this->routes) {
-            throw new \LogicException('No route defined');
-        }
-
-        $match = $this->routeMatch(null, null, $routes);
+        $match = $this->getRouter()->match($this->getPath(), $this->getVerb(), $routes);
 
         $this->setHeaders($this->preCors());
 
