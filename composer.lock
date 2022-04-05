@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4ddce3fed3cd435cf54a400d30514b1c",
+    "content-hash": "c627f3a63612513d22f7cd38813b6cd1",
     "packages": [
         {
             "name": "ekok/php-cache",
