@@ -1,6 +1,6 @@
 <?php
 
-use Ekok\Router\Attribute\Route;
+use Ekok\Config\Attribute\Route;
 
 class AController
 {

@@ -7,10 +7,12 @@ namespace Ekok\App;
 use Ekok\Utils\Arr;
 use Ekok\Utils\Str;
 use Ekok\Logger\Log;
+use Ekok\Utils\Call;
 use Ekok\Utils\File;
 use Ekok\Cache\Cache;
 use Ekok\Container\Di;
 use Ekok\Router\Router;
+use Ekok\Config\Configurator;
 use Ekok\EventDispatcher\Dispatcher;
 use Ekok\EventDispatcher\Event as BaseEvent;
 
@@ -21,30 +23,16 @@ class Env
     const ROUTE_PARAMS = '/(?:\/?@(\w+)(?:(?::([^\/?]+)|(\*)))?(\?)?)/';
     const ROUTE_PATTERN = '/^\s*([\w|]+)(?:\s*@([^\s]+))?(?:\s*(\/[^\s]*))?(?:\s*\[([^\]]+)\])?\s*$/';
 
-    public static function create(string $name = null, array $data = null, array $rules = null)
-    {
-        $rule = array('shared' => true, 'alias' => true, 'inherit' => false);
+    /** @var Di */
+    private $di;
 
-        return new static(
-            $name,
-            new Di(
-                array_replace_recursive(
-                    array(
-                        'log' => $rule + array('class' => Log::class),
-                        'cache' => $rule + array('class' => Cache::class),
-                        'router' => $rule + array('class' => Router::class),
-                        'dispatcher' => $rule + array('class' => Dispatcher::class),
-                    ),
-                    $rules ?? array(),
-                ),
-            ),
-            $data,
-        );
+    public static function create(string $name = null, array $data = null)
+    {
+        return new static($name, $data);
     }
 
-    public function __construct(private string|null $name, private Di $di, private array|null $data = null)
+    public function __construct(private string|null $name, private array|null $data = null)
     {
-        $this->registerSelf();
         $this->initialize();
     }
 
@@ -69,9 +57,24 @@ class Env
         return $this;
     }
 
+    public function getCache(): Cache
+    {
+        return $this->make(Cache::class);
+    }
+
+    public function getConfig(): Configurator
+    {
+        return $this->make(Configurator::class);
+    }
+
     public function getContainer(): Di
     {
         return $this->di;
+    }
+
+    public function getDispatcher(): Dispatcher
+    {
+        return $this->make(Dispatcher::class);
     }
 
     public function getLog(): Log
@@ -79,19 +82,9 @@ class Env
         return $this->make(Log::class);
     }
 
-    public function getCache(): Cache
-    {
-        return $this->make(Cache::class);
-    }
-
     public function getRouter(): Router
     {
         return $this->make(Router::class);
-    }
-
-    public function getDispatcher(): Dispatcher
-    {
-        return $this->make(Dispatcher::class);
     }
 
     public function call(string|callable $cb, ...$args)
@@ -111,8 +104,12 @@ class Env
         return $this;
     }
 
-    public function listen(string $eventName, callable|string $handler, int $priority = null, bool $once = false): static
-    {
+    public function listen(
+        string $eventName,
+        callable|string $handler,
+        int $priority = null,
+        bool $once = false,
+    ): static {
         $this->getDispatcher()->on($eventName, $handler, $priority, $once);
 
         return $this;
@@ -153,7 +150,9 @@ class Env
 
     public function get(string $key)
     {
-        return $this->data[$key] ?? (method_exists($this, $get = 'get' . $key) ? $this->$get() : null);
+        return $this->data[$key] ?? (
+            method_exists($this, $get = 'get' . $key) ? $this->$get() : null
+        );
     }
 
     public function set(string $key, $value): static
@@ -193,7 +192,7 @@ class Env
                     is_string($key)
                     && is_array($value)
                     && (
-                        ($expr = $this->di->isCallExpression($key))
+                        ($expr = Call::check($key))
                         || '@' === $key[0]
                     )
                 ) {
@@ -234,14 +233,30 @@ class Env
 
     public function setProjectDir(string $projectDir): static
     {
-        $this->data['project_dir'] = rtrim(Str::fixslashes($projectDir), '/');
+        $this->data['project_dir'] = Str::fixslash($projectDir);
+
+        return $this;
+    }
+
+    public function getTmpDir(): string|null
+    {
+        return $this->data['tmp_dir'] ?? (
+            $this->data['tmp_dir'] = $this->getProjectDir() . '/var'
+        );
+    }
+
+    public function setTmpDir(string $tmpDir): static
+    {
+        $this->data['tmp_dir'] = Str::fixslash($tmpDir);
 
         return $this;
     }
 
     public function getSeed(): string
     {
-        return $this->data['seed'] ?? ($this->data['seed'] = Str::hash($this->getProjectDir() ?? static::class));
+        return $this->data['seed'] ?? (
+            $this->data['seed'] = Str::hash($this->getProjectDir() ?? static::class)
+        );
     }
 
     public function setSeed(string|null $seed): static
@@ -277,7 +292,9 @@ class Env
 
     public function getPreviousUrl(string $fallbackUrl = null): string|null
     {
-        return $this->data['previous_url'] ?? ($this->data['previous_url'] = $this->getResolvedPreviousUrl() ?? $fallbackUrl);
+        return $this->data['previous_url'] ?? (
+            $this->data['previous_url'] = $this->getResolvedPreviousUrl() ?? $fallbackUrl
+        );
     }
 
     public function setPreviousUrl(string $url): static
@@ -301,7 +318,9 @@ class Env
 
     public function isDebug(): bool
     {
-        return $this->data['debug'] ?? ($this->data['debug'] = $this->isName('dev', 'development'));
+        return $this->data['debug'] ?? (
+            $this->data['debug'] = $this->isName('dev', 'development')
+        );
     }
 
     public function setDebug(bool $debug): static
@@ -398,7 +417,12 @@ class Env
 
     public function addDnsbl(string $host): static
     {
-        if ($add = filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_NULL_ON_FAILURE) ?? filter_var($host, FILTER_VALIDATE_IP, FILTER_NULL_ON_FAILURE|FILTER_FLAG_IPV4)) {
+        $add = (
+            filter_var($host, FILTER_VALIDATE_IP, FILTER_NULL_ON_FAILURE|FILTER_FLAG_IPV4)
+            ?? filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_NULL_ON_FAILURE)
+        );
+
+        if ($add) {
             $this->data['dnsbl'][] = $add;
         }
 
@@ -449,13 +473,26 @@ class Env
         return $this;
     }
 
-    public function error(\Throwable|int $code = 500, string $message = null, array $headers = null, array $payload = null): static
-    {
+    public function error(
+        \Throwable|int $code = 500,
+        string $message = null,
+        array $headers = null,
+        array $payload = null,
+    ): static {
         if ($code instanceof Redirection) {
             return match(true) {
                 $code->isBack => $this->redirectBack($code->url),
-                $code->isRoute => $this->redirectTo($code->url ?? '/', $code->args, $code->permanent, $code->statusCode),
-                default => $this->redirect($code->url ?? '/', $code->permanent, $code->statusCode),
+                $code->isRoute => $this->redirectTo(
+                    $code->url ?? '/',
+                    $code->args,
+                    $code->permanent,
+                    $code->statusCode,
+                ),
+                default => $this->redirect(
+                    $code->url ?? '/',
+                    $code->permanent,
+                    $code->statusCode,
+                ),
             };
         }
 
@@ -512,8 +549,12 @@ class Env
         return $this->getRouter()->alias($alias, $args);
     }
 
-    public function createUrl(string $path, array $args = null, bool $absolute = false, bool $entry = true): string
-    {
+    public function createUrl(
+        string $path,
+        array $args = null,
+        bool $absolute = false,
+        bool $entry = true,
+    ): string {
         return (
             ($absolute ? $this->getBaseUrl() : $this->getBasePath()) .
             ($entry && ($front = $this->getEntry()) ? '/' . $front : null) .
@@ -536,14 +577,18 @@ class Env
         return $this->url($this->getPath(), $this->data['GET'] ?? array(), $absolute);
     }
 
-    public function getMatch(string $key = null, array|string|callable|null $default = null): array|string|callable|null
-    {
+    public function getMatch(
+        string $key = null,
+        array|string|callable|null $default = null,
+    ): array|string|callable|null {
         return $key ? ($this->data['match'][$key] ?? $default) : ($this->data['match'] ?? null);
     }
 
     public function redirect(string $url, bool $permanent = null, int $code = null): static
     {
-        $this->dispatch($event = new Event\Redirect($code ?? ($permanent ? 301 : 302), $url, $permanent));
+        $event = new Event\Redirect($code ?? ($permanent ? 301 : 302), $url, $permanent);
+
+        $this->dispatch($event);
 
         if (!$event->isPropagationStopped()) {
             $this->addHeader('Location', $event->getUrl());
@@ -576,9 +621,7 @@ class Env
 
     public function routeLoad(string ...$directories): static
     {
-        $router = $this->getRouter();
-
-        array_walk($directories, static fn(string $directory) => $router->load($directory));
+        $this->getConfig()->loadRoutes(...$directories);
 
         return $this;
     }
@@ -650,7 +693,9 @@ class Env
 
     public function getBody(): string|null
     {
-        return $this->data['body'] ?? ($this->data['body'] = $this->isRaw() ? null : file_get_contents('php://input'));
+        return $this->data['body'] ?? (
+            $this->data['body'] = $this->isRaw() ? null : file_get_contents('php://input')
+        );
     }
 
     public function setBody(string $body): static
@@ -704,7 +749,9 @@ class Env
     {
         $options = FILTER_NULL_ON_FAILURE | array_reduce(
             $ranges,
-            fn (int $options, string $range) => $options | (defined($flag = 'FILTER_FLAG_' . strtoupper($range) . '_RANGE') ? constant($flag) : 0),
+            fn (int $options, string $range) => $options | (
+                defined($flag = 'FILTER_FLAG_' . strtoupper($range) . '_RANGE') ? constant($flag) : 0
+            ),
             $version && defined($flag = 'FILTER_FLAG_IPV' . $version) ? constant($flag) : FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6,
         );
 
@@ -803,10 +850,10 @@ class Env
 
     public function getBasePath(): string
     {
-        return $this->data['basepath'] ?? ($this->data['basepath'] = $this->isBuiltin() || $this->isCli() ? '' : rtrim(
-            Str::fixslashes(dirname($this->data['SERVER']['SCRIPT_NAME'] ?? '')),
-            '/',
-        ));
+        return $this->data['basepath'] ?? (
+            $this->data['basepath'] = $this->isBuiltin() || $this->isCli() ? '' :
+                Str::fixslash(dirname($this->data['SERVER']['SCRIPT_NAME'] ?? ''))
+        );
     }
 
     public function setBasePath(string $basePath): static
@@ -858,7 +905,9 @@ class Env
 
     public function isSecure(): bool
     {
-        return $this->data['secure'] ?? ($this->data['secure'] = !!($this->data['SERVER']['HTTPS'] ?? null));
+        return $this->data['secure'] ?? (
+            $this->data['secure'] = !!($this->data['SERVER']['HTTPS'] ?? null)
+        );
     }
 
     public function setSecure(bool $secure): static
@@ -870,7 +919,9 @@ class Env
 
     public function getScheme(): string
     {
-        return $this->data['scheme'] ?? ($this->data['scheme'] = $this->isSecure() ? 'https' : 'http');
+        return $this->data['scheme'] ?? (
+            $this->data['scheme'] = $this->isSecure() ? 'https' : 'http'
+        );
     }
 
     public function setScheme(string $scheme): static
@@ -882,7 +933,9 @@ class Env
 
     public function getHost(): string
     {
-        return $this->data['host'] ?? ($this->data['host'] = strstr(($this->data['SERVER']['HTTP_HOST'] ?? 'localhost') . ':', ':', true));
+        return $this->data['host'] ?? (
+            $this->data['host'] = strstr(($this->data['SERVER']['HTTP_HOST'] ?? 'localhost') . ':', ':', true)
+        );
     }
 
     public function setHost(string $host): static
@@ -894,7 +947,9 @@ class Env
 
     public function getPort(): int
     {
-        return $this->data['port'] ?? ($this->data['port'] = intval($this->data['SERVER']['SERVER_PORT'] ?? 80));
+        return $this->data['port'] ?? (
+            $this->data['port'] = intval($this->data['SERVER']['SERVER_PORT'] ?? 80)
+        );
     }
 
     public function setPort(string|int $port): static
@@ -906,7 +961,9 @@ class Env
 
     public function getEntry(): string|null
     {
-        return $this->data['entry'] ?? ($this->data['entry'] = $this->isBuiltin() || $this->isCli() ? '' : basename($this->data['SERVER']['SCRIPT_NAME'] ?? ''));
+        return $this->data['entry'] ?? (
+            $this->data['entry'] = $this->isBuiltin() || $this->isCli() ? '' : basename($this->data['SERVER']['SCRIPT_NAME'] ?? '')
+        );
     }
 
     public function setEntry(string|null $entry): static
@@ -940,7 +997,9 @@ class Env
 
     public function getProtocol(): string
     {
-        return $this->data['protocol'] ?? ($this->data['protocol'] = $this->data['SERVER']['SERVER_PROTOCOL'] ?? 'HTTP/1.1');
+        return $this->data['protocol'] ?? (
+            $this->data['protocol'] = $this->data['SERVER']['SERVER_PROTOCOL'] ?? 'HTTP/1.1'
+        );
     }
 
     public function setProtocol(string $protocol): static
@@ -1021,7 +1080,10 @@ class Env
     {
         return Arr::reduce(
             $this->hasHeader($key, $found) ? $found : array(),
-            fn(array $headers, string $header) => array_merge($headers, $this->data['headers'][$header]),
+            fn(array $headers, string $header) => array_merge(
+                $headers,
+                $this->data['headers'][$header],
+            ),
             array(),
         );
     }
@@ -1234,8 +1296,14 @@ class Env
     public function setOutput($value, string $mime = null): static
     {
         list($setOutput, $setMime) = match(true) {
-            is_array($value) || $value instanceof \JsonSerializable => array(json_encode($value), 'application/json'),
-            is_scalar($value) || $value instanceof \Stringable => array((string) $value, 'text/html'),
+            is_array($value) || $value instanceof \JsonSerializable => array(
+                json_encode($value),
+                'application/json',
+            ),
+            is_scalar($value) || $value instanceof \Stringable => array(
+                (string) $value,
+                'text/html',
+            ),
             default => array(null, null),
         };
 
@@ -1326,8 +1394,13 @@ class Env
         return $this->data['sent'] ?? ($this->data['sent'] = headers_sent());
     }
 
-    public function send($value = null, array $headers = null, int $status = null, string|null $mime = null, int $kbps = null): static
-    {
+    public function send(
+        $value = null,
+        array $headers = null,
+        int $status = null,
+        string|null $mime = null,
+        int $kbps = null,
+    ): static {
         if ($this->sent()) {
             return $this;
         }
@@ -1379,8 +1452,14 @@ class Env
         return $this;
     }
 
-    public function sendFile(string $file, array $headers = null, string|bool $download = null, bool $range = false, string|null $mime = null, int $kbps = null): static
-    {
+    public function sendFile(
+        string $file,
+        array $headers = null,
+        string|bool $download = null,
+        bool $range = false,
+        string|null $mime = null,
+        int $kbps = null,
+    ): static {
         if ($this->sent()) {
             return $this;
         }
@@ -1404,7 +1483,10 @@ class Env
         $length = $size;
         $header = $range ? ($this->data['SERVER']['HTTP_RANGE'] ?? null) : null;
 
-        if ($header && !preg_match('/^bytes=(?:(\d+)-(\d+)?)|(?:\-(\d+))/', $header, $parts, PREG_UNMATCHED_AS_NULL)) {
+        if (
+            $header
+            && !preg_match('/^bytes=(?:(\d+)-(\d+)?)|(?:\-(\d+))/', $header, $parts, PREG_UNMATCHED_AS_NULL)
+        ) {
             return $this->send(status: 416, headers: array('Content-Range' => sprintf('bytes */%u', $size)));
         }
 
@@ -1434,8 +1516,12 @@ class Env
         return $this;
     }
 
-    public function shoutFile(string $file, int $kbps = null, int $seek = null, int $length = null): void
-    {
+    public function shoutFile(
+        string $file,
+        int $kbps = null,
+        int $seek = null,
+        int $length = null,
+    ): void {
         $fp = fopen($file, 'rb');
         $size = $length ?? filesize($file);
 
@@ -1510,11 +1596,13 @@ class Env
         );
     }
 
-    public function setRenderSetup(string|array $directories, string|array $extensions = null): static
-    {
+    public function setRenderSetup(
+        string|array $directories,
+        string|array $extensions = null,
+    ): static {
         $this->data['render'] = array(
             'directories' => array_map(
-                static fn(string $dir) => rtrim(Str::fixslashes($dir), '/') . '/',
+                static fn(string $dir) => Str::fixslash($dir) . '/',
                 Arr::ensure($directories),
             ),
             'extensions' => array_map(
@@ -1541,7 +1629,8 @@ class Env
                             $setup['extensions'],
                             static fn(string $ext) => (
                                 file_exists($found = $dir . $file . $ext)
-                                || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ? $found : null
+                                || file_exists($found = $dir . strtr($file, '.', '/') . $ext) ?
+                                    $found : null
                             )
                         )) ? $found : null
                     )
@@ -1550,8 +1639,12 @@ class Env
         ) ? $found : null;
     }
 
-    public function render(string $file, array $data = null, bool $safe = false, $defaults = null): mixed
-    {
+    public function render(
+        string $file,
+        array $data = null,
+        bool $safe = false,
+        $defaults = null,
+    ): mixed {
         $found = $this->renderFind($file);
 
         if (!$found && $safe) {
@@ -1569,7 +1662,11 @@ class Env
 
     public function getErrorTemplate(string $name = null): string|null
     {
-        return $this->data['error_template'][$name] ?? $this->data['error_template'][strtolower($name)] ?? null;
+        return (
+            $this->data['error_template'][$name]
+            ?? $this->data['error_template'][strtolower($name)]
+            ?? null
+        );
     }
 
     public function setErrorTemplate(string $name, string $template): static
@@ -1713,8 +1810,12 @@ class Env
         return false;
     }
 
-    private function doResponse($result, string $output = null, \Closure $getOutput = null, string|int $kbps = null): void
-    {
+    private function doResponse(
+        $result,
+        string $output = null,
+        \Closure $getOutput = null,
+        string|int $kbps = null,
+    ): void {
         if ($result instanceof Event\Request) {
             $event = new Event\Response(null);
             $event->setOutput($result->getOutput() ?? $output);
@@ -1794,8 +1895,19 @@ class Env
         return $headers;
     }
 
+    private function initialize(): void
+    {
+        $this->registerSelf();
+        $this->registerGlobals();
+        $this->registerErrorTemplate();
+        $this->registerExceptionHandler();
+        $this->registerConfiguration();
+        $this->registerContainerRules();
+    }
+
     private function registerSelf(): void
     {
+        $this->di = new Di();
         $this->di->inject($this, array('alias' => 'env', 'name' => static::class));
 
         if (self::class !== static::class) {
@@ -1848,10 +1960,27 @@ TEXT;
         set_exception_handler(fn(\Throwable $error) => $this->error($error));
     }
 
-    protected function initialize(): void
+    private function registerContainerRules(): void
     {
-        $this->registerGlobals();
-        $this->registerErrorTemplate();
-        $this->registerExceptionHandler();
+        $this->di->register($this->getContainerRules());
+    }
+
+    protected function registerConfiguration(): void
+    {
+        // anything to do loading configuration
+    }
+
+    protected function getContainerRules(): array
+    {
+        return array_fill_keys(
+            array(
+                Cache::class,
+                Configurator::class,
+                Dispatcher::class,
+                Log::class,
+                Router::class,
+            ),
+            array('shared' => true, 'alias' => true, 'inherit' => false),
+        );
     }
 }

@@ -32,23 +32,23 @@ class EnvTest extends \Codeception\Test\Unit
             $data['quiet'] = $quiet;
         }
 
-        return Env::create('test', $data, $rules);
+        $env = Env::create('test', $data);
+
+        if ($rules) {
+            $env->getContainer()->register($rules);
+        }
+
+        return $env;
     }
 
     public function testDependencies()
     {
         $this->assertSame($this->env->getDispatcher(), $this->env->getContainer()->make(Dispatcher::class));
-        $this->assertSame($this->env->getDispatcher(), $this->env->getContainer()->make('dispatcher'));
         $this->assertSame($this->env->getCache(), $this->env->getContainer()->make(Cache::class));
-        $this->assertSame($this->env->getCache(), $this->env->getContainer()->make('cache'));
         $this->assertSame($this->env->getRouter(), $this->env->getContainer()->make(Router::class));
-        $this->assertSame($this->env->getRouter(), $this->env->getContainer()->make('router'));
         $this->assertSame($this->env->getLog(), $this->env->getContainer()->make(Log::class));
-        $this->assertSame($this->env->getLog(), $this->env->getContainer()->make('log'));
         $this->assertSame($this->env, $this->env->getContainer()->make(Env::class));
-        $this->assertSame($this->env, $this->env->getContainer()->make('env'));
         $this->assertSame($this->env->getContainer(), $this->env->getContainer()->make(Di::class));
-        $this->assertSame($this->env->getContainer(), $this->env->getContainer()->make('di'));
     }
 
     public function testInitializationAndState()
@@ -90,8 +90,10 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('test', $this->env->getName());
         $this->assertSame(true, $this->env->isName('test'));
         $this->assertSame(null, $this->env->getProjectDir());
+        $this->assertSame('/var', $this->env->getTmpDir());
         $this->assertSame('3lxu8sqeg7sw8', $this->env->getSeed());
         $this->assertSame('lang', $this->env->getLanguageKey());
+        $this->assertStringContainsString('{code} - {text}', $this->env->getErrorTemplate('CLI'));
 
         // mutate
         $this->assertSame('POST', $this->env->setVerb('post')->getVerb());
@@ -112,6 +114,7 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('http://localhost/foo', $this->env->setBaseUrl('http://localhost/foo')->getBaseUrl());
         $this->assertSame('dev', $this->env->setName('dev')->getName());
         $this->assertSame('dev', $this->env->setProjectDir('dev//')->getProjectDir());
+        $this->assertSame('dev', $this->env->setTmpDir('dev//')->getTmpDir());
         $this->assertSame('dev', $this->env->setSeed('dev')->getSeed());
         $this->assertSame('_lang', $this->env->setLanguageKey('_lang')->getLanguageKey());
     }
@@ -1169,6 +1172,7 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame('test', $env->getUserAgent());
         $this->assertSame(gethostname(), $env->getServerIp());
         $this->assertSame('127.0.0.1', $env->getClientIp());
+        $this->assertSame('127.0.0.1', $env->getClientIp(4, 'NO_PRIV'));
     }
 
     public function testRecommendedLanguage()
@@ -1282,6 +1286,9 @@ class EnvTest extends \Codeception\Test\Unit
 
     public function testBlacklist()
     {
+        $domain = 'dnsbl.spfbl.net';
+        $domainIp = '54.233.253.229';
+
         $this->assertFalse($this->env->isBlacklisted('127.0.0.1'));
 
         $this->env->setExempt(array(
@@ -1289,9 +1296,7 @@ class EnvTest extends \Codeception\Test\Unit
             '192.168.*',
             '100.*.1.1',
         ));
-        $this->env->setDnsbl(array(
-            'dnsbl.spfbl.net',
-        ));
+        $this->env->setDnsbl(array($domain, $domainIp));
 
         $this->assertFalse($this->env->isBlacklisted('127.0.0.1'));
         $this->assertFalse($this->env->isBlacklisted('192.168.20.1'));
