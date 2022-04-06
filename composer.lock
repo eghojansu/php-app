@@ -53,16 +53,16 @@
         },
         {
             "name": "ekok/php-config",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-config.git",
-                "reference": "3c53bd6d933709046b708460b40a9aa163191084"
+                "reference": "7f2da144c41d701a80ae7c61526fc5bc2ac16828"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/3c53bd6d933709046b708460b40a9aa163191084",
-                "reference": "3c53bd6d933709046b708460b40a9aa163191084",
+                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/7f2da144c41d701a80ae7c61526fc5bc2ac16828",
+                "reference": "7f2da144c41d701a80ae7c61526fc5bc2ac16828",
                 "shasum": ""
             },
             "require": {
@@ -97,22 +97,22 @@
             "description": "PHP Config",
             "support": {
                 "issues": "https://github.com/eghojansu/php-config/issues",
-                "source": "https://github.com/eghojansu/php-config/tree/v0.1.0"
+                "source": "https://github.com/eghojansu/php-config/tree/v0.1.1"
             },
-            "time": "2022-04-06T12:54:23+00:00"
+            "time": "2022-04-06T15:42:18+00:00"
         },
         {
             "name": "ekok/php-container",
-            "version": "v0.2.3",
+            "version": "v0.2.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-container.git",
-                "reference": "3a840db6df9f5e3ae2eed8bcdcf2521572f87975"
+                "reference": "2746cf842bf0bbb1f404bc6cbb23dca12280cc60"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/3a840db6df9f5e3ae2eed8bcdcf2521572f87975",
-                "reference": "3a840db6df9f5e3ae2eed8bcdcf2521572f87975",
+                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/2746cf842bf0bbb1f404bc6cbb23dca12280cc60",
+                "reference": "2746cf842bf0bbb1f404bc6cbb23dca12280cc60",
                 "shasum": ""
             },
             "require": {
@@ -143,9 +143,9 @@
             "description": "PHP Container",
             "support": {
                 "issues": "https://github.com/eghojansu/php-container/issues",
-                "source": "https://github.com/eghojansu/php-container/tree/v0.2.3"
+                "source": "https://github.com/eghojansu/php-container/tree/v0.2.4"
             },
-            "time": "2022-04-06T05:55:07+00:00"
+            "time": "2022-04-06T15:37:06+00:00"
         },
         {
             "name": "ekok/php-event-dispatcher",
