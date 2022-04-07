@@ -520,7 +520,7 @@ class Env
             };
         }
 
-        $error_ = null;
+        $error_ = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
         $code_ = $code;
         $headers_ = $headers;
         $message_ = $message;

@@ -9,12 +9,14 @@ use Ekok\Utils\Arr;
 class Error extends Request
 {
     private $error;
+    private $trace;
     private $message;
     private $payload;
 
-    public function __construct(int $code, string $message = null, array $headers = null, array $payload = null, \Throwable $error = null)
+    public function __construct(int $code, string $message = null, array $headers = null, array $payload = null, \Throwable|array $error = null)
     {
-        $this->error = $error;
+        $this->error = is_array($error) ? null : $error;
+        $this->trace = $error;
 
         $this->setCode($code);
         $this->setMessage($message);
@@ -29,7 +31,7 @@ class Error extends Request
 
     public function getTrace(): array
     {
-        return Arr::formatTrace($this->error ?? array());
+        return Arr::formatTrace($this->trace ?? $this->error);
     }
 
     public function getMessage(): string|null
