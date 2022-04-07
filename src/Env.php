@@ -41,22 +41,6 @@ class Env
         return $this->get($name);
     }
 
-    public function make(string $key, array $args = null)
-    {
-        return $this->di->make($key, $args);
-    }
-
-    public function rule(string|array $name, array|callable|string $rule = null): static
-    {
-        if (is_array($name)) {
-            $this->di->register($name);
-        } else {
-            $this->di->addRule($name, $rule);
-        }
-
-        return $this;
-    }
-
     public function getCache(): Cache
     {
         return $this->make(Cache::class);
@@ -85,6 +69,43 @@ class Env
     public function getRouter(): Router
     {
         return $this->make(Router::class);
+    }
+
+    public function loadServices(string ...$directories): static
+    {
+        $this->getConfig()->loadServices(...$directories);
+
+        return $this;
+    }
+
+    public function loadSubscribers(string ...$directories): static
+    {
+        $this->getConfig()->loadSubscribers(...$directories);
+
+        return $this;
+    }
+
+    public function loadRoutes(string ...$directories): static
+    {
+        $this->getConfig()->loadRoutes(...$directories);
+
+        return $this;
+    }
+
+    public function make(string $key, array $args = null)
+    {
+        return $this->di->make($key, $args);
+    }
+
+    public function rule(string|array $name, array|callable|string $rule = null): static
+    {
+        if (is_array($name)) {
+            $this->di->register($name);
+        } else {
+            $this->di->addRule($name, $rule);
+        }
+
+        return $this;
     }
 
     public function call(string|callable $cb, ...$args)
@@ -151,7 +172,10 @@ class Env
     public function get(string $key)
     {
         return $this->data[$key] ?? (
-            method_exists($this, $get = 'get' . $key) ? $this->$get() : null
+            (
+                method_exists($this, $get = 'get' . $key)
+                || method_exists($this, $get = 'is' . $key)
+            ) ? $this->$get() : null
         );
     }
 
@@ -619,16 +643,9 @@ class Env
         return $this->redirect($this->getPreviousUrl($fallbackUrl ?? $this->url('/')), null, 303);
     }
 
-    public function routeLoad(string ...$directories): static
-    {
-        $this->getConfig()->loadRoutes(...$directories);
-
-        return $this;
-    }
-
     public function routeAll(array $routes): static
     {
-        array_walk($routes, fn ($handler, $route) => $this->route($route, $handler));
+        $this->getRouter()->routeAll($routes);
 
         return $this;
     }
@@ -1901,8 +1918,8 @@ class Env
         $this->registerGlobals();
         $this->registerErrorTemplate();
         $this->registerExceptionHandler();
-        $this->registerConfiguration();
         $this->registerContainerRules();
+        $this->registerConfiguration();
     }
 
     private function registerSelf(): void
@@ -1967,7 +1984,7 @@ TEXT;
 
     protected function registerConfiguration(): void
     {
-        // anything to do loading configuration
+        // anything to do loading advanced configuration
     }
 
     protected function getContainerRules(): array

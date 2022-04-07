@@ -53,16 +53,16 @@
         },
         {
             "name": "ekok/php-config",
-            "version": "v0.1.1",
+            "version": "v0.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-config.git",
-                "reference": "7f2da144c41d701a80ae7c61526fc5bc2ac16828"
+                "reference": "2d407340d7006223a7bf24405617f79dc4707f8b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/7f2da144c41d701a80ae7c61526fc5bc2ac16828",
-                "reference": "7f2da144c41d701a80ae7c61526fc5bc2ac16828",
+                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/2d407340d7006223a7bf24405617f79dc4707f8b",
+                "reference": "2d407340d7006223a7bf24405617f79dc4707f8b",
                 "shasum": ""
             },
             "require": {
@@ -97,9 +97,9 @@
             "description": "PHP Config",
             "support": {
                 "issues": "https://github.com/eghojansu/php-config/issues",
-                "source": "https://github.com/eghojansu/php-config/tree/v0.1.1"
+                "source": "https://github.com/eghojansu/php-config/tree/v0.1.2"
             },
-            "time": "2022-04-06T15:42:18+00:00"
+            "time": "2022-04-07T02:48:40+00:00"
         },
         {
             "name": "ekok/php-container",

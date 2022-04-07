@@ -1377,11 +1377,30 @@ class EnvTest extends \Codeception\Test\Unit
         $this->assertSame($expected, $actual);
     }
 
-    public function testLoadRoute()
+    public function testLoadRoutes()
     {
-        $this->env->routeLoad(TEST_DATA . '/classes/Controller');
+        $this->env->loadRoutes(TEST_DATA . '/classes/Controller');
         $this->env->run();
 
         $this->assertSame('Welcome home', $this->env->getOutput());
+    }
+
+    public function testLoadSubscribers()
+    {
+        $this->env->loadSubscribers(TEST_DATA . '/classes/Subscriber');
+        $this->env->dispatch($event = Event::named('onFoo'));
+
+        $this->assertTrue($event->isPropagationStopped());
+    }
+
+    public function testLoadServices()
+    {
+        $this->env->loadServices(TEST_DATA . '/classes/Service');
+
+        $foo = $this->env->make('FooService');
+        $foo2 = $this->env->make('FooService');
+
+        $this->assertInstanceOf('FooService', $foo);
+        $this->assertSame($foo, $foo2);
     }
 }
