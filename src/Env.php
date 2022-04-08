@@ -574,7 +574,7 @@ class Env
 
     public function createUrl(
         string $path,
-        array $args = null,
+        array|string $args = null,
         bool $absolute = false,
         bool $entry = true,
     ): string {
@@ -585,12 +585,12 @@ class Env
         );
     }
 
-    public function url(string $path, array $args = null, bool $absolute = false): string
+    public function url(string $path, array|string $args = null, bool $absolute = false): string
     {
         return $this->createUrl($path, $args, $absolute);
     }
 
-    public function baseurl(string $path, array $args = null, bool $absolute = false): string
+    public function baseurl(string $path, array|string $args = null, bool $absolute = false): string
     {
         return $this->createUrl($path, $args, $absolute, false);
     }
