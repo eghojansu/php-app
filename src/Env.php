@@ -166,24 +166,23 @@ class Env
 
     public function has(string $key): bool
     {
-        return isset($this->data[$key]) || ($this->data && array_key_exists($key, $this->data));
+        return (
+            isset($this->data[$key])
+            || ($this->data && array_key_exists($key, $this->data))
+            || $this->access($key)
+        );
     }
 
     public function get(string $key)
     {
-        return $this->data[$key] ?? (
-            (
-                method_exists($this, $get = 'get' . $key)
-                || method_exists($this, $get = 'is' . $key)
-            ) ? $this->$get() : null
-        );
+        return $this->data[$key] ?? (($this->access($key, $get)) ? $this->$get() : null);
     }
 
     public function set(string $key, $value): static
     {
-        if (method_exists($this, $set = 'set' . $key)) {
+        if ($this->access($key, $set, false, true)) {
             $this->$set($value);
-        } elseif (method_exists($this, 'get' . $key)) {
+        } elseif ($this->access($key)) {
             throw new \LogicException(sprintf('Data is readonly: %s', $key));
         } else {
             $this->data[$key] = $value;
@@ -1607,7 +1606,7 @@ class Env
 
     public function getRenderSetup(): array
     {
-        return $this->data['render'] ?? array(
+        return $this->data['render_setup'] ?? array(
             'directories' => array(),
             'extensions' => array('.php'),
         );
@@ -1617,7 +1616,7 @@ class Env
         string|array $directories,
         string|array $extensions = null,
     ): static {
-        $this->data['render'] = array(
+        $this->data['render_setup'] = array(
             'directories' => array_map(
                 static fn(string $dir) => Str::fixslash($dir) . '/',
                 Arr::ensure($directories),
@@ -1755,6 +1754,28 @@ class Env
         };
     }
 
+    private function access(
+        string $key,
+        string &$method = null,
+        bool $read = true,
+        bool $write = false,
+    ): bool {
+        $case = Str::casePascal($key);
+        $method = Arr::first(
+            array_merge(
+                $read ? array('get', 'is', 'has') : array(),
+                $write ? array('set') : array(),
+            ),
+            fn (string $method) => match (true) {
+                method_exists($this, $found = $method . $key) => $found,
+                method_exists($this, $found = $method . $case) => $found,
+                default => null,
+            },
+        );
+
+        return !!$method;
+    }
+
     private function runInternal(): void
     {
         $this->spamChecks();
@@ -1851,11 +1872,14 @@ class Env
         if (is_callable($response = $event->getResult())) {
             $this->call($response);
         } elseif (
-            !$response ||
-            ($raw = is_scalar($response) || is_array($response) || $response instanceof \Stringable)
+            $event->getOutput()
+            || (
+                !$response
+                || ($raw = is_scalar($response) || is_array($response) || $response instanceof \Stringable)
+            )
         ) {
             $this->send(
-                ($raw ?? false) ? $response : $event->getOutput() ?? ($getOutput ? $getOutput() : null),
+                $event->getOutput() ?: (($raw ?? false) ? $response : $event->getOutput() ?? ($getOutput ? $getOutput() : null)),
                 $event->getHeaders(),
                 $event->getCode(),
                 $event->getMime(),

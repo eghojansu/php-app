@@ -796,9 +796,11 @@ class EnvTest extends \Codeception\Test\Unit
             'POST' => array('int' => '100'),
             'FILES' => array('foo' => 'bar'),
             'ENV' => array('foo' => 'bar'),
+            'null' => null,
         ));
 
         $this->assertSame(true, $env->has('foo'));
+        $this->assertSame(true, $env->has('null'));
         $this->assertSame('bar', $env->get('foo'));
         $this->assertSame('bar', $env->getFiles('foo'));
         $this->assertSame(null, $env->getServer('REQUEST_METHOD'));
