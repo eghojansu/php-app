@@ -53,16 +53,16 @@
         },
         {
             "name": "ekok/php-config",
-            "version": "v0.1.2",
+            "version": "v0.1.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-config.git",
-                "reference": "2d407340d7006223a7bf24405617f79dc4707f8b"
+                "reference": "1520d488f77df8fef37c39aaca7e0b39ac01c6f3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/2d407340d7006223a7bf24405617f79dc4707f8b",
-                "reference": "2d407340d7006223a7bf24405617f79dc4707f8b",
+                "url": "https://api.github.com/repos/eghojansu/php-config/zipball/1520d488f77df8fef37c39aaca7e0b39ac01c6f3",
+                "reference": "1520d488f77df8fef37c39aaca7e0b39ac01c6f3",
                 "shasum": ""
             },
             "require": {
@@ -97,22 +97,22 @@
             "description": "PHP Config",
             "support": {
                 "issues": "https://github.com/eghojansu/php-config/issues",
-                "source": "https://github.com/eghojansu/php-config/tree/v0.1.2"
+                "source": "https://github.com/eghojansu/php-config/tree/v0.1.3"
             },
-            "time": "2022-04-07T02:48:40+00:00"
+            "time": "2022-04-13T04:23:15+00:00"
         },
         {
             "name": "ekok/php-container",
-            "version": "v0.2.4",
+            "version": "v0.2.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-container.git",
-                "reference": "2746cf842bf0bbb1f404bc6cbb23dca12280cc60"
+                "reference": "d2df4b6607e85d1fba8da74dbb5ab6b2076c6db2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/2746cf842bf0bbb1f404bc6cbb23dca12280cc60",
-                "reference": "2746cf842bf0bbb1f404bc6cbb23dca12280cc60",
+                "url": "https://api.github.com/repos/eghojansu/php-container/zipball/d2df4b6607e85d1fba8da74dbb5ab6b2076c6db2",
+                "reference": "d2df4b6607e85d1fba8da74dbb5ab6b2076c6db2",
                 "shasum": ""
             },
             "require": {
@@ -143,9 +143,9 @@
             "description": "PHP Container",
             "support": {
                 "issues": "https://github.com/eghojansu/php-container/issues",
-                "source": "https://github.com/eghojansu/php-container/tree/v0.2.4"
+                "source": "https://github.com/eghojansu/php-container/tree/v0.2.6"
             },
-            "time": "2022-04-06T15:37:06+00:00"
+            "time": "2022-04-13T05:28:39+00:00"
         },
         {
             "name": "ekok/php-event-dispatcher",
@@ -286,16 +286,16 @@
         },
         {
             "name": "ekok/php-utils",
-            "version": "v0.2.0",
+            "version": "v0.2.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/eghojansu/php-utils.git",
-                "reference": "d2659acc18ebf4a68b11dba5ee4c7af935020011"
+                "reference": "02f3cdd8c798ae78643aa4ea21cbd0293b6f84d9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/d2659acc18ebf4a68b11dba5ee4c7af935020011",
-                "reference": "d2659acc18ebf4a68b11dba5ee4c7af935020011",
+                "url": "https://api.github.com/repos/eghojansu/php-utils/zipball/02f3cdd8c798ae78643aa4ea21cbd0293b6f84d9",
+                "reference": "02f3cdd8c798ae78643aa4ea21cbd0293b6f84d9",
                 "shasum": ""
             },
             "require": {
@@ -325,9 +325,9 @@
             "description": "PHP Utilities",
             "support": {
                 "issues": "https://github.com/eghojansu/php-utils/issues",
-                "source": "https://github.com/eghojansu/php-utils/tree/v0.2.0"
+                "source": "https://github.com/eghojansu/php-utils/tree/v0.2.2"
             },
-            "time": "2022-04-06T01:49:59+00:00"
+            "time": "2022-04-11T01:38:57+00:00"
         }
     ],
     "packages-dev": [
@@ -4806,5 +4806,5 @@
         "php": ">=8.0"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.2.0"
+    "plugin-api-version": "2.1.0"
 }

@@ -361,6 +361,7 @@ class EnvTest extends \Codeception\Test\Unit
                 . '|param2=' . implode(',', $env->getMatch('param2'))
             );
         });
+        $env->route('GET /not-callable', 'stdClass@none');
         $env->run();
 
         $this->assertSame($expected, $env->getOutput());
@@ -433,6 +434,11 @@ class EnvTest extends \Codeception\Test\Unit
             'tag function' => array('tags=foo,bar|param=foo,bar|param2=foo,bar', array(
                 'SERVER' => array(
                     'REQUEST_URI' => '/rich-tags',
+                ),
+            )),
+            'not found coz not callable' => array('[CLI] localhost [404 - Not Found] GET /not-callable', array(
+                'SERVER' => array(
+                    'REQUEST_URI' => '/not-callable',
                 ),
             )),
         );

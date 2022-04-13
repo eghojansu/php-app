@@ -118,6 +118,11 @@ class Env
         return $this->di->callArguments($cb, $args);
     }
 
+    public function getCallable(string|callable $cb): callable|null
+    {
+        return is_callable($fn = $this->di->getCallable($cb)) ? $fn : null;
+    }
+
     public function addSubscribers(array $subscribers): static
     {
         $this->getDispatcher()->addSubscribers($subscribers);
@@ -562,7 +567,7 @@ class Env
             Arr::formatTrace($event->getPayload() ?? $event->getError() ?? array()),
         );
 
-        $this->doResponse($event, null, fn () => $this->errorBuild($event));
+        $this->runResponse($event, null, fn () => $this->errorBuild($event));
 
         return $this;
     }
@@ -618,7 +623,7 @@ class Env
         }
 
         if (!$this->runInterception($event)) {
-            $this->doResponse($event);
+            $this->runResponse($event);
         }
 
         return $this;
@@ -1778,20 +1783,19 @@ class Env
 
     private function runInternal(): void
     {
-        $this->spamChecks();
-
+        $this->runSpamChecks();
         $this->dispatch($event = new Event\Request());
 
         if ($this->runInterception($event)) {
             return;
         }
 
+        $this->runPreCors();
+
         $match = $this->getRouter()->match($this->getPath(), $this->getVerb(), $routes);
 
-        $this->setHeaders($this->preCors());
-
         if (!$routes || (!$match && !$this->isVerb('OPTIONS'))) {
-            throw Http::errorNotFound();
+            throw Http::error(404);
         }
 
         $result = null;
@@ -1807,11 +1811,13 @@ class Env
                 return;
             }
 
+            if (!$controller = $this->getCallable($event->getController())) {
+                throw Http::error(404);
+            }
+
             $kbps = $event->getKbps();
-            list($result, $output) = $this->runHandle(
-                $event->getController(),
-                $event->getArguments(),
-            );
+
+            list($result, $output) = $this->runHandle($controller, $event->getArguments());
         }
 
         if ($this->isVerb('OPTIONS')) {
@@ -1819,11 +1825,11 @@ class Env
             $output = null;
         }
 
-        $this->setHeaders($this->postCors(array_keys($routes)));
-        $this->doResponse($result, $output, null, $kbps);
+        $this->runPostCors(array_keys($routes));
+        $this->runResponse($result, $output, null, $kbps);
     }
 
-    private function runHandle(string|callable $handler, array|null $args): array
+    private function runHandle(callable $handler, array|null $args): array
     {
         $this->startBuffering();
 
@@ -1840,7 +1846,7 @@ class Env
         }
 
         if ($event->isPropagationStopped()) {
-            $this->doResponse($event);
+            $this->runResponse($event);
 
             return true;
         }
@@ -1848,7 +1854,7 @@ class Env
         return false;
     }
 
-    private function doResponse(
+    private function runResponse(
         $result,
         string $output = null,
         \Closure $getOutput = null,
@@ -1888,25 +1894,27 @@ class Env
         }
     }
 
-    private function spamChecks(): void
+    private function runSpamChecks(): void
     {
         if (
             ($ip = $this->getClientIp())
             && $this->isBlacklisted($ip)
         ) {
-            throw Http::errorForbidden();
+            throw Http::error(403);
         }
     }
 
-    private function preCors(): array
+    private function runPreCors(): void
     {
-        return $this->isCors() ? array(
+        $headers = $this->isCors() ? array(
             'Access-Control-Allow-Origin' => (true === ($allow = $this->getCors('origin'))) ? $this->data['SERVER']['HTTP_ORIGIN'] : $allow,
             'Access-Control-Allow-Credentials' => var_export($this->getCors('credentials') ?? false, true),
         ) : array();
+
+        $this->setHeaders($headers);
     }
 
-    private function postCors(array $verbs): array
+    private function runPostCors(array $verbs): void
     {
         $cors = $this->isCors();
         $setup = $this->getCors();
@@ -1933,7 +1941,7 @@ class Env
             $headers['Access-Control-Max-Age'] = var_export($setup['ttl'], true);
         }
 
-        return $headers;
+        $this->setHeaders($headers);
     }
 
     private function initialize(): void
